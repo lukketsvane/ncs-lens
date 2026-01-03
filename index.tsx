@@ -23,7 +23,9 @@ import {
   CheckCircle2,
   Search,
   Palette,
-  Droplet
+  Droplet,
+  ArrowRightLeft,
+  XCircle
 } from "lucide-react";
 
 // --- Constants ---
@@ -194,7 +196,14 @@ const parseNCSStr = (code: string) => {
 // --- Components ---
 
 // 1. Color Detail Overlay
-const ColorDetailView = ({ color, onBack }: { color: ColorMatch, onBack: () => void }) => {
+const CURATED_COMPARISONS: ColorMatch[] = [
+  { system: "NCS", code: "S 0300-N", name: "Pure White", hex: "#FFFFFF", location: "-", confidence: "High", materialGuess: "-", finishGuess: "-", laymanDescription: "-", lrv: "100", cmyk: "0,0,0,0", rgb: "255,255,255" },
+  { system: "NCS", code: "S 0502-Y", name: "Standard White", hex: "#F2F0EB", location: "-", confidence: "High", materialGuess: "-", finishGuess: "-", laymanDescription: "-", lrv: "85", cmyk: "0,0,5,0", rgb: "242,240,235" },
+  { system: "NCS", code: "S 4500-N", name: "Middle Grey", hex: "#8B8B8B", location: "-", confidence: "High", materialGuess: "-", finishGuess: "-", laymanDescription: "-", lrv: "30", cmyk: "0,0,0,45", rgb: "139,139,139" },
+  { system: "NCS", code: "S 9000-N", name: "Black", hex: "#212121", location: "-", confidence: "High", materialGuess: "-", finishGuess: "-", laymanDescription: "-", lrv: "5", cmyk: "0,0,0,90", rgb: "33,33,33" },
+];
+
+const ColorDetailView = ({ color, history, onBack }: { color: ColorMatch, history: HistoryItem[], onBack: () => void }) => {
   const contrastText = getContrastColor(color.hex);
   const isNCS = color.system === 'NCS';
   
@@ -203,18 +212,40 @@ const ColorDetailView = ({ color, onBack }: { color: ColorMatch, onBack: () => v
   const chroma = color.chromaticness || parseNCSStr(color.code)?.chroma || "--";
   const hue = color.hue || parseNCSStr(color.code)?.hue || "";
   
-  const [activeTab, setActiveTab] = useState<'details' | 'combinations'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'combinations' | 'compare'>('details');
+  const [compareColor, setCompareColor] = useState<ColorMatch | null>(null);
+
+  // Derive available colors for comparison
+  const comparisonList = React.useMemo(() => {
+    const list: ColorMatch[] = [];
+    const seen = new Set<string>();
+    
+    // Add history colors
+    history.forEach(item => {
+      item.result.colors.forEach(c => {
+        if (c.code !== color.code && !seen.has(c.code)) {
+          list.push(c);
+          seen.add(c.code);
+        }
+      });
+    });
+    return list;
+  }, [history, color]);
 
   return (
     <div className="fixed inset-0 z-[60] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
       
       {/* 1. Top Section - Visual Navigator (Matches Screenshot) */}
       <div 
-        className="relative pt-safe-top pb-8 px-6 transition-colors duration-500 shadow-sm z-10"
-        style={{ backgroundColor: color.hex }}
+        className={`relative pt-safe-top pb-8 px-6 transition-all duration-500 shadow-sm z-10 flex flex-col`}
+        style={{ 
+          backgroundColor: color.hex,
+          height: activeTab === 'compare' && compareColor ? '50%' : 'auto',
+          minHeight: activeTab === 'compare' && compareColor ? '0' : '35%'
+        }}
       >
         {/* Navigation */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
            <button 
             onClick={onBack}
             className={`flex items-center gap-1 text-sm font-medium ${contrastText} opacity-80 hover:opacity-100`}
@@ -231,15 +262,17 @@ const ColorDetailView = ({ color, onBack }: { color: ColorMatch, onBack: () => v
         </div>
 
         {/* NCS Data Display */}
-        <div className={`flex flex-col items-center justify-center ${contrastText}`}>
+        <div className={`flex flex-col items-center justify-center flex-1 ${contrastText}`}>
           {isNCS ? (
             <div className="w-full max-w-sm">
-              {/* Labels */}
-              <div className="flex justify-between text-[10px] font-bold tracking-widest uppercase opacity-60 mb-2 px-8">
-                <span className="w-16 text-center">Blackness</span>
-                <span className="w-16 text-center">Chroma</span>
-                <span className="w-24 text-center">Hue</span>
-              </div>
+              {/* Labels - Hide in small split mode */}
+              {(!compareColor || activeTab !== 'compare') && (
+                <div className="flex justify-between text-[10px] font-bold tracking-widest uppercase opacity-60 mb-2 px-8">
+                  <span className="w-16 text-center">Blackness</span>
+                  <span className="w-16 text-center">Chroma</span>
+                  <span className="w-24 text-center">Hue</span>
+                </div>
+              )}
               
               {/* Values */}
               <div className="flex justify-between items-baseline px-2">
@@ -255,13 +288,9 @@ const ColorDetailView = ({ color, onBack }: { color: ColorMatch, onBack: () => v
                    {hue}
                  </div>
               </div>
-              
-              <div className="text-center mt-4 text-xs font-medium opacity-50 tracking-widest">
-                nuance & hue
-              </div>
             </div>
           ) : (
-             <div className="text-center py-10">
+             <div className="text-center py-4">
                <h1 className="text-6xl font-bold tracking-tight mb-2">{color.code}</h1>
                <p className="text-lg opacity-80">{color.system} Standard</p>
              </div>
@@ -269,7 +298,7 @@ const ColorDetailView = ({ color, onBack }: { color: ColorMatch, onBack: () => v
         </div>
       </div>
 
-      {/* 2. Tabs */}
+      {/* 2. Tabs (Hide if comparing to give full screen effect? No, keep to switch back) */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-20">
         <div className="flex">
           <button 
@@ -282,35 +311,30 @@ const ColorDetailView = ({ color, onBack }: { color: ColorMatch, onBack: () => v
             onClick={() => setActiveTab('combinations')}
             className={`flex-1 py-4 text-sm font-semibold text-center border-b-2 transition-colors ${activeTab === 'combinations' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}
           >
-            Material Context
+            Context
+          </button>
+          <button 
+            onClick={() => setActiveTab('compare')}
+            className={`flex-1 py-4 text-sm font-semibold text-center border-b-2 transition-colors ${activeTab === 'compare' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}
+          >
+            Compare
           </button>
         </div>
       </div>
 
       {/* 3. Content List */}
-      <div className="flex-1 overflow-y-auto no-scrollbar bg-white safe-area-bottom">
-        {activeTab === 'details' ? (
-          <div className="divide-y divide-gray-100">
+      <div className="flex-1 overflow-y-auto no-scrollbar bg-white safe-area-bottom relative">
+        {activeTab === 'details' && (
+          <div className="divide-y divide-gray-100 animate-in fade-in">
             <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
                <span className="text-gray-500 text-sm">Name</span>
                <span className="text-gray-900 font-semibold font-mono">{color.code}</span>
             </div>
-            
+            {/* ... other details ... */}
             <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
                <span className="text-gray-500 text-sm">Collection</span>
                <span className="text-gray-900 font-medium">{color.system} 2050</span>
             </div>
-
-            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
-               <span className="text-gray-500 text-sm">Vendor</span>
-               <span className="text-gray-900 font-medium">{color.system} Color AB</span>
-            </div>
-
-            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
-               <span className="text-gray-500 text-sm">Category</span>
-               <span className="text-gray-900 font-medium">Reference</span>
-            </div>
-
              {/* Technical Data Section */}
              <div className="bg-gray-50/50 px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
                Technical Data
@@ -330,14 +354,11 @@ const ColorDetailView = ({ color, onBack }: { color: ColorMatch, onBack: () => v
                <span className="text-gray-500 text-sm">RGB Value</span>
                <span className="text-gray-900 font-mono font-medium">{color.rgb || "N/A"}</span>
             </div>
-
-            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
-               <span className="text-gray-500 text-sm">Hex</span>
-               <span className="text-gray-900 font-mono font-medium">{color.hex}</span>
-            </div>
           </div>
-        ) : (
-           <div className="p-6 space-y-8">
+        )}
+
+        {activeTab === 'combinations' && (
+           <div className="p-6 space-y-8 animate-in fade-in">
               <div className="space-y-4">
                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Material Identification</h3>
                  <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex items-start gap-4">
@@ -353,34 +374,87 @@ const ColorDetailView = ({ color, onBack }: { color: ColorMatch, onBack: () => v
                     </div>
                  </div>
               </div>
-
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Usage Context</h3>
-                <div className="flex items-center gap-3 p-4 border border-gray-100 rounded-xl">
-                  <div className="w-2 h-8 bg-black rounded-full"></div>
-                  <div>
-                    <span className="text-xs text-gray-400 font-bold uppercase">Location</span>
-                    <div className="font-semibold text-gray-900">{color.location}</div>
-                  </div>
-                </div>
-              </div>
            </div>
+        )}
+
+        {activeTab === 'compare' && (
+          <div className="h-full flex flex-col animate-in fade-in">
+             {compareColor ? (
+               // Split View Mode
+               <div 
+                 className="flex-1 w-full relative transition-colors duration-500 flex flex-col items-center justify-center"
+                 style={{ backgroundColor: compareColor.hex }}
+               >
+                 <button 
+                    onClick={() => setCompareColor(null)}
+                    className="absolute top-4 right-4 p-2 bg-black/20 text-white rounded-full hover:bg-black/40 backdrop-blur-md"
+                  >
+                   <XCircle size={24} />
+                 </button>
+                 
+                 <div className={`text-center ${getContrastColor(compareColor.hex)}`}>
+                    <h2 className="text-5xl font-light tracking-tighter mb-2">{compareColor.code.split(" ").pop()}</h2>
+                    <p className="text-sm font-medium opacity-70 uppercase tracking-widest">{compareColor.name}</p>
+                 </div>
+                 
+                 {/* Floating VS Badge */}
+                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-white text-black font-bold text-xs px-3 py-1 rounded-full shadow-lg border border-gray-100 z-30">
+                   VS
+                 </div>
+               </div>
+             ) : (
+               // Selection Mode
+               <div className="p-6 space-y-8">
+                 <div>
+                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Standard References</h3>
+                   <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                     {CURATED_COMPARISONS.map((c, i) => (
+                       <button 
+                         key={i}
+                         onClick={() => setCompareColor(c)}
+                         className="flex-shrink-0 flex flex-col items-center gap-2 group"
+                       >
+                         <div className="w-16 h-16 rounded-full border border-gray-200 shadow-sm group-hover:scale-105 transition-transform" style={{ backgroundColor: c.hex }} />
+                         <span className="text-xs font-medium text-gray-600 max-w-[80px] truncate">{c.name}</span>
+                       </button>
+                     ))}
+                   </div>
+                 </div>
+
+                 <div>
+                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Recent Scans</h3>
+                   {comparisonList.length === 0 ? (
+                     <p className="text-gray-400 text-sm italic">No other scans to compare with.</p>
+                   ) : (
+                     <div className="grid grid-cols-4 gap-4">
+                       {comparisonList.map((c, i) => (
+                         <button 
+                           key={i}
+                           onClick={() => setCompareColor(c)}
+                           className="flex flex-col items-center gap-2 group"
+                         >
+                           <div className="w-full aspect-square rounded-2xl border border-gray-200 shadow-sm group-hover:scale-105 transition-transform" style={{ backgroundColor: c.hex }} />
+                           <span className="text-[10px] font-medium text-gray-600 w-full truncate text-center">{c.code.split(" ").pop()}</span>
+                         </button>
+                       ))}
+                     </div>
+                   )}
+                 </div>
+               </div>
+             )}
+          </div>
         )}
       </div>
 
-      {/* Bottom Actions */}
-      <div className="p-4 border-t border-gray-100 bg-white safe-area-bottom">
-        <button className="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2">
-           <Palette size={18} />
-           <span>Find Similar Colors</span>
-        </button>
-        <div className="mt-2 text-center">
-             <button className="text-gray-400 text-sm font-medium py-2 hover:text-gray-600">
-               Save to folder
-             </button>
+      {/* Bottom Actions - Hide in compare mode to maximize space */}
+      {!(activeTab === 'compare' && compareColor) && (
+        <div className="p-4 border-t border-gray-100 bg-white safe-area-bottom">
+          <button className="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2">
+            <Palette size={18} />
+            <span>Find Similar Colors</span>
+          </button>
         </div>
-      </div>
-
+      )}
     </div>
   );
 };
@@ -744,6 +818,7 @@ const App = () => {
       {detailColor && (
         <ColorDetailView 
           color={detailColor} 
+          history={history}
           onBack={() => setDetailColor(null)} 
         />
       )}
