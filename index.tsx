@@ -28,52 +28,18 @@ import {
   XCircle,
   User
 } from "lucide-react";
-
-// --- Constants ---
-const EDGE_CONFIG_STORE_ID = "ecfg_xlrdrn2ms13tkf3hezgonww7tpbk"; // Prepared for backend integration
-
-// --- Types ---
-
-interface ColorMatch {
-  system: "RAL" | "NCS";
-  code: string;
-  name: string;
-  hex: string;
-  location: string;
-  confidence: string;
-  materialGuess: string;
-  finishGuess: string;
-  laymanDescription: string;
-  // Technical Details
-  lrv?: string;
-  cmyk?: string;
-  rgb?: string;
-  blackness?: string;
-  chromaticness?: string;
-  hue?: string;
-}
-
-interface Material {
-  name: string;
-  texture: string;
-  finish: string;
-}
-
-interface AnalysisResult {
-  productType: string;
-  materials: Material[];
-  colors: ColorMatch[];
-}
-
-interface HistoryItem {
-  id: string;
-  timestamp: number;
-  image: string;
-  result: AnalysisResult;
-  author?: string; // New: For community items
-}
-
-type Tab = 'scan' | 'history' | 'community' | 'profile';
+import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
+import { ProfileView, LoginModal, QuotaExceededModal } from "./src/components";
+import { databaseService } from "./src/services/database";
+import { stripeService } from "./src/services/stripe";
+import { 
+  ColorMatch, 
+  Material, 
+  AnalysisResult, 
+  HistoryItem, 
+  Tab,
+  SUBSCRIPTION_PLANS 
+} from "./src/types";
 
 // --- API Helper ---
 
@@ -646,7 +612,10 @@ const GridView = ({
   );
 };
 
-const App = () => {
+const AppContent = () => {
+  // Auth Context
+  const { user, canPerformScan, recordScan, remainingScans, signInWithGoogle, updateUser } = useAuth();
+  
   // Navigation State
   const [activeTab, setActiveTab] = useState<Tab>('scan');
   
@@ -658,29 +627,73 @@ const App = () => {
     } catch { return []; }
   });
   
-  const [communityItems, setCommunityItems] = useState<HistoryItem[]>(() => {
-    // Initial load: Mix curated items with any locally "published" items
-    const localPublished = localStorage.getItem('cmf_community_local');
-    const parsedLocal = localPublished ? JSON.parse(localPublished) : [];
-    return parsedLocal;
-  });
+  const [communityItems, setCommunityItems] = useState<HistoryItem[]>([]);
 
   // UI State
   const [loading, setLoading] = useState(false);
   const [detailItem, setDetailItem] = useState<HistoryItem | null>(null);
   const [detailColor, setDetailColor] = useState<ColorMatch | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Persistence
+  // Load community items from database on mount
   useEffect(() => {
-    localStorage.setItem('cmf_history', JSON.stringify(history));
-  }, [history]);
+    const loadCommunityItems = async () => {
+      try {
+        const items = await databaseService.getCommunityItems();
+        setCommunityItems(items);
+      } catch (error) {
+        console.error('Error loading community items:', error);
+      }
+    };
+    loadCommunityItems();
+  }, []);
+
+  // Sync history with database when user is logged in
+  useEffect(() => {
+    const syncUserHistory = async () => {
+      if (user) {
+        try {
+          await databaseService.syncHistory(history, user.id);
+        } catch (error) {
+          console.error('Error syncing history:', error);
+        }
+      }
+    };
+    if (history.length > 0) {
+      syncUserHistory();
+    }
+  }, [history, user]);
+
+  // Persistence for guests
+  useEffect(() => {
+    if (!user) {
+      localStorage.setItem('cmf_history', JSON.stringify(history));
+    }
+  }, [history, user]);
 
   // Handlers
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) processFile(file);
+    if (file) {
+      // Check scan quota before processing
+      if (!canPerformScan()) {
+        setShowQuotaModal(true);
+        return;
+      }
+      processFile(file);
+    }
+  };
+
+  const handleScanClick = () => {
+    // Check scan quota before opening file picker
+    if (!canPerformScan()) {
+      setShowQuotaModal(true);
+      return;
+    }
+    fileInputRef.current?.click();
   };
 
   const processFile = (file: File) => {
@@ -694,11 +707,20 @@ const App = () => {
           id: Date.now().toString(),
           timestamp: Date.now(),
           image: reader.result as string,
-          result: result
+          result: result,
+          userId: user?.id
         };
         setHistory(prev => [newItem, ...prev]);
         setDetailItem(newItem);
-        setActiveTab('scan'); // Ensure we are on a tab that makes sense, though detail overlay covers it
+        setActiveTab('scan');
+        
+        // Record the scan for quota tracking
+        recordScan();
+        
+        // Save to database if logged in
+        if (user) {
+          await databaseService.saveToHistory(newItem, user.id);
+        }
       } catch (err) {
         alert("Analysis failed. Please try again.");
       } finally {
@@ -706,6 +728,23 @@ const App = () => {
       }
     };
     reader.readAsDataURL(file);
+  };
+  
+  const handleUpgrade = async () => {
+    if (!user) {
+      setShowLoginModal(true);
+      setShowQuotaModal(false);
+      return;
+    }
+    
+    try {
+      await stripeService.createCheckoutSession(user.id, SUBSCRIPTION_PLANS.pro.priceId);
+      updateUser({ subscription: 'pro' });
+      setShowQuotaModal(false);
+    } catch (error) {
+      console.error('Upgrade failed:', error);
+      alert('Upgrade failed. Please try again.');
+    }
   };
 
   const handleRegenerate = async () => {
@@ -724,22 +763,25 @@ const App = () => {
     }
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!detailItem) return;
-    // Simulate publishing to Edge Config
-    const publishedItem = { ...detailItem, author: "You", id: `pub-${Date.now()}` };
     
-    // Update local community state
-    const newCommunityList = [publishedItem, ...communityItems];
-    setCommunityItems(newCommunityList);
+    // Require login to publish
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
     
-    // Persist "locally published" items to simulate a server
-    const localOnly = newCommunityList.filter(i => i.author === "You");
-    localStorage.setItem('cmf_community_local', JSON.stringify(localOnly));
-    
-    // Optional: Switch to community tab to show it appeared
-    // setActiveTab('community');
-    // setDetailItem(null);
+    try {
+      // Publish to database
+      const publishedItem = await databaseService.publishToCommunity(detailItem, user);
+      
+      // Update local community state
+      setCommunityItems(prev => [publishedItem, ...prev]);
+    } catch (error) {
+      console.error('Publish failed:', error);
+      alert('Failed to publish. Please try again.');
+    }
   };
 
   // Render
@@ -759,14 +801,25 @@ const App = () => {
       <main className="h-full">
         {activeTab === 'scan' && (
           <div className="p-4 pt-safe-top flex flex-col h-screen pb-24">
-            <div className="flex items-center gap-2 mb-8 mt-2">
-              <span className="w-2 h-6 bg-black rounded-full block"></span>
-              <h1 className="text-xl font-bold tracking-tight">CMF Lens</h1>
+            <div className="flex items-center justify-between mb-8 mt-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-6 bg-black rounded-full block"></span>
+                <h1 className="text-xl font-bold tracking-tight">CMF Lens</h1>
+              </div>
+              {/* Scan quota indicator */}
+              {user && user.subscription === 'free' && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Camera size={16} className="text-gray-400" />
+                  <span className={`font-medium ${remainingScans === 0 ? 'text-red-500' : remainingScans <= 2 ? 'text-amber-500' : 'text-gray-500'}`}>
+                    {remainingScans}/{SUBSCRIPTION_PLANS.free.scanLimit}
+                  </span>
+                </div>
+              )}
             </div>
             
             <div className="flex-1 flex flex-col justify-center items-center pb-12">
               <div 
-                onClick={() => fileInputRef.current?.click()}
+                onClick={handleScanClick}
                 className="group relative cursor-pointer bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] shadow-[0_20px_40px_rgba(0,0,0,0.05)] border border-white flex flex-col items-center justify-center gap-8 overflow-hidden transition-all active:scale-[0.98] hover:shadow-[0_25px_50px_rgba(0,0,0,0.08)]"
               >
                 <div className="absolute inset-0 bg-gradient-to-tr from-gray-50 via-white to-gray-50 opacity-50" />
@@ -803,6 +856,10 @@ const App = () => {
             onSelect={setDetailItem} 
           />
         )}
+
+        {activeTab === 'profile' && (
+          <ProfileView onSignInClick={() => setShowLoginModal(true)} />
+        )}
       </main>
 
       {/* --- Overlays --- */}
@@ -823,6 +880,18 @@ const App = () => {
           onBack={() => setDetailColor(null)} 
         />
       )}
+
+      {/* --- Modals --- */}
+      <LoginModal 
+        isOpen={showLoginModal} 
+        onClose={() => setShowLoginModal(false)} 
+      />
+      
+      <QuotaExceededModal 
+        isOpen={showQuotaModal} 
+        onClose={() => setShowQuotaModal(false)} 
+        onUpgrade={handleUpgrade}
+      />
 
       {/* --- Bottom Navigation --- */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-gray-100 pb-safe-bottom z-30">
@@ -852,11 +921,11 @@ const App = () => {
           </button>
 
           <button 
-            disabled
-            className="flex flex-col items-center gap-1 p-2 opacity-40 cursor-not-allowed"
+            onClick={() => setActiveTab('profile')}
+            className={`flex flex-col items-center gap-1 p-2 transition-colors ${activeTab === 'profile' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
           >
-            <User strokeWidth={2} size={24} className="text-gray-400" />
-            <span className="text-[10px] font-medium text-gray-400">Profile</span>
+            <User strokeWidth={activeTab === 'profile' ? 2.5 : 2} size={24} />
+            <span className="text-[10px] font-medium">Profile</span>
           </button>
         </div>
       </div>
@@ -869,6 +938,15 @@ const App = () => {
         className="hidden"
       />
     </div>
+  );
+};
+
+// Wrap the app with AuthProvider
+const App = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 
