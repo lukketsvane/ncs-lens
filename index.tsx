@@ -63,44 +63,6 @@ interface HistoryItem {
 
 type Tab = 'scan' | 'history' | 'community';
 
-// --- Curated Data (Simulating Edge Config Content) ---
-const CURATED_COMMUNITY_ITEMS: HistoryItem[] = [
-  {
-    id: "demo-1",
-    timestamp: Date.now() - 86400000,
-    author: "DesignArchive_Oslo",
-    image: "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?q=80&w=600&auto=format&fit=crop", 
-    result: {
-      productType: "Eames Lounge Chair (Classic)",
-      materials: [
-        { name: "Plywood", texture: "Smooth", finish: "Oiled Palisander" },
-        { name: "Leather", texture: "Grainy", finish: "Semi-aniline" }
-      ],
-      colors: [
-         { system: "NCS", code: "S 8505-Y20R", name: "Espresso", hex: "#3E332E", location: "Leather", confidence: "High", materialGuess: "Full Grain Leather", finishGuess: "Satin", laymanDescription: "Deep, rich brown with soft highlights." },
-         { system: "NCS", code: "S 4040-Y20R", name: "Rosewood", hex: "#785640", location: "Shell", confidence: "High", materialGuess: "Rosewood Veneer", finishGuess: "Oiled", laymanDescription: "Warm, reddish wood tone with dark grain." }
-      ]
-    }
-  },
-  {
-    id: "demo-2",
-    timestamp: Date.now() - 172800000,
-    author: "Dieter_Fan",
-    image: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?q=80&w=600&auto=format&fit=crop", 
-    result: {
-      productType: "Modern Minimalist Interior",
-      materials: [
-        { name: "Plaster", texture: "Matte", finish: "Paint" },
-        { name: "Oak", texture: "Natural", finish: "White Oil" }
-      ],
-      colors: [
-         { system: "NCS", code: "S 1002-Y", name: "Warm White", hex: "#F2F0EB", location: "Walls", confidence: "High", materialGuess: "Gypsum Plaster", finishGuess: "Matte", laymanDescription: "Soft, chalky white that reflects light gently." },
-         { system: "NCS", code: "S 3010-G30Y", name: "Sage Green", hex: "#9CAea9", location: "Cabinet", confidence: "Medium", materialGuess: "Painted MDF", finishGuess: "Satin", laymanDescription: "Muted, earthy green with grey undertones." }
-      ]
-    }
-  }
-];
-
 // --- API Helper ---
 
 const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
@@ -485,8 +447,8 @@ const GridView = ({
 
        {items.length === 0 ? (
          <div className="flex flex-col items-center justify-center h-[50vh] text-gray-400">
-           <Layers size={48} className="mb-4 opacity-20" />
-           <p>Collection is empty</p>
+           {title === 'Discover' ? <Globe size={48} className="mb-4 opacity-20" /> : <Layers size={48} className="mb-4 opacity-20" />}
+           <p>{title === 'Discover' ? 'No shared items yet' : 'Collection is empty'}</p>
          </div>
        ) : (
          <div className="grid grid-cols-2 gap-3">
@@ -540,7 +502,7 @@ const App = () => {
     // Initial load: Mix curated items with any locally "published" items
     const localPublished = localStorage.getItem('cmf_community_local');
     const parsedLocal = localPublished ? JSON.parse(localPublished) : [];
-    return [...parsedLocal, ...CURATED_COMMUNITY_ITEMS];
+    return parsedLocal;
   });
 
   // UI State
