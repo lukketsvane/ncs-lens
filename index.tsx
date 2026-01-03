@@ -21,7 +21,9 @@ import {
   RefreshCw,
   Globe,
   CheckCircle2,
-  Search
+  Search,
+  Palette,
+  Droplet
 } from "lucide-react";
 
 // --- Constants ---
@@ -39,6 +41,13 @@ interface ColorMatch {
   materialGuess: string;
   finishGuess: string;
   laymanDescription: string;
+  // Technical Details
+  lrv?: string;
+  cmyk?: string;
+  rgb?: string;
+  blackness?: string;
+  chromaticness?: string;
+  hue?: string;
 }
 
 interface Material {
@@ -97,9 +106,16 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
             confidence: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
             materialGuess: { type: Type.STRING, description: "Precise material identification (e.g. 'Soap Treated Oak', 'Anodized Aluminum')." },
             finishGuess: { type: Type.STRING, description: "Surface finish (e.g. 'Satin Varnish', 'Matte Powder Coat', 'Brushed')." },
-            laymanDescription: { type: Type.STRING, description: "A sensory description of the look and feel for non-experts." }
+            laymanDescription: { type: Type.STRING, description: "A sensory description of the look and feel for non-experts." },
+            // Enhanced Technical Fields
+            lrv: { type: Type.STRING, description: "Light Reflectance Value (0-100) typical for this color standard." },
+            cmyk: { type: Type.STRING, description: "Standard CMYK values (e.g. '0, 50, 100, 0')." },
+            rgb: { type: Type.STRING, description: "Standard RGB values (e.g. '255, 120, 0')." },
+            blackness: { type: Type.STRING, description: "NCS Blackness component (00-99)." },
+            chromaticness: { type: Type.STRING, description: "NCS Chromaticness component (00-99)." },
+            hue: { type: Type.STRING, description: "NCS Hue component (e.g. 'Y20R')." }
           },
-          required: ["system", "code", "name", "hex", "location", "confidence", "materialGuess", "finishGuess", "laymanDescription"],
+          required: ["system", "code", "name", "hex", "location", "confidence", "materialGuess", "finishGuess", "laymanDescription", "lrv", "cmyk", "rgb"],
         },
       },
     },
@@ -117,36 +133,33 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
           },
         },
         {
-          text: `Act as a world-class Color, Material, and Finish (CMF) Designer. Analyze the uploaded product image with extreme precision for a professional design database.
+          text: `Act as a precision Colorimeter and CMF Expert. Analyze the image to identify materials and colors with database-level accuracy.
 
-1. **Product Identification**: Identify the specific design object or describe its style and type accurately.
+**CRITICAL: Lighting Correction**
+Before identifying colors, mathematically compensate for the lighting in the image (e.g., remove yellow cast from warm indoor lights, correct exposure). Identify the *true* underlying color of the object as if viewed under D65 standard daylight.
 
-2. **Material Analysis**: Break down the object into its primary materials. Distinguish subtle differences:
-   - Wood: Is it Oiled Oak, Soap Treated Beech, Walnut Veneer?
-   - Metal: Is it Brushed Aluminum, Chrome Plated Steel, Powder Coated?
-   - Plastic: Is it Matte Polypropylene, High Gloss ABS?
-   - Textile: Is it Wool Felt, Bouclé, Canvas?
+**Analysis Steps:**
+1. **Product**: Identify the object.
+2. **Materials**: Analyze surface texture and finish.
+3. **Exact Color Matching**: 
+   - Identify the closest **NCS S-Series** or **RAL Classic** code.
+   - **Precision**: If a wall looks like "white", determine if it's "S 0500-N" (Pure White) or "S 0502-Y" (Standard White). Look for subtle undertones.
+   - **Technical Data**: Provide standard technical specifications (LRV, CMYK) associated with the identified code, NOT just the pixel values.
 
-3. **Color Matching (Crucial)**:
-   - For **Paints, Plastics, Coatings, Textiles**: You MUST provide the closest **NCS S-series** code (Natural Color System). Format MUST be 'S XXXX-YZZR' (e.g., 'S 2030-Y90R').
-   - For **Industrial Metals**: Provide **RAL Classic** codes (e.g., 'RAL 9005 Jet Black').
-   - For **Natural Materials** (Wood, Stone): Provide the nearest NCS equivalent that matches the visual dominance of the material.
-   
-4. **Contextual Description**:
-   - 'laymanDescription': Explain the surface sensation and look in simple, sensory terms (e.g., "A warm, honey-colored wood with visible grain patterns and a smooth matte touch").
-   - 'finishGuess': Be specific about the reflection and texture (e.g., 'Matte Lacquer', 'Satin', 'High Gloss', 'Raw').
+**NCS Notation Rules:**
+- Format: "S BBCC-H" (e.g., S 1050-Y90R).
+- BB = Blackness (00-99).
+- CC = Chromaticness (00-99).
+- H = Hue (e.g., Y, Y10R, R, R80B, B, G).
 
-5. **Lighting Correction**:
-   - Account for the lighting in the photo (e.g., warm indoor light, cool shadow). Try to predict the *true* object color as if seen in neutral daylight (D65).
-
-Ensure high accuracy. If the image quality is poor, deduce the likely standard specification for this object type.`,
+Return the data in the specified JSON schema.`,
         },
       ],
     },
     config: {
       responseMimeType: "application/json",
       responseSchema: responseSchema,
-      temperature: 0.4, 
+      temperature: 0.2, // Lower temperature for more deterministic/accurate technical data
     },
   });
 
@@ -165,7 +178,8 @@ const getContrastColor = (hex: string) => {
   return yiq >= 128 ? 'text-black' : 'text-white';
 };
 
-const parseNCS = (code: string) => {
+const parseNCSStr = (code: string) => {
+  // Try to parse NCS string if API didn't return perfect parts, or for display formatting
   const match = code.match(/S?\s*(\d{2})(\d{2})-(.*)/i);
   if (match) {
     return {
@@ -182,120 +196,191 @@ const parseNCS = (code: string) => {
 // 1. Color Detail Overlay
 const ColorDetailView = ({ color, onBack }: { color: ColorMatch, onBack: () => void }) => {
   const contrastText = getContrastColor(color.hex);
-  const ncsData = color.system === 'NCS' ? parseNCS(color.code) : null;
-  const [activeTab, setActiveTab] = useState<'details' | 'material'>('details');
+  const isNCS = color.system === 'NCS';
+  
+  // Use API data if available, fallback to regex parsing
+  const blackness = color.blackness || parseNCSStr(color.code)?.blackness || "--";
+  const chroma = color.chromaticness || parseNCSStr(color.code)?.chroma || "--";
+  const hue = color.hue || parseNCSStr(color.code)?.hue || "";
+  
+  const [activeTab, setActiveTab] = useState<'details' | 'combinations'>('details');
 
   return (
     <div className="fixed inset-0 z-[60] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
-      {/* Top Half - Color Surface */}
+      
+      {/* 1. Top Section - Visual Navigator (Matches Screenshot) */}
       <div 
-        className="flex-1 relative flex flex-col items-center justify-center p-6 transition-colors duration-500"
+        className="relative pt-safe-top pb-8 px-6 transition-colors duration-500 shadow-sm z-10"
         style={{ backgroundColor: color.hex }}
       >
-        <button 
-          onClick={onBack}
-          className={`absolute top-safe-top left-4 p-2 rounded-full bg-black/10 backdrop-blur-md border border-white/10 ${contrastText} hover:bg-black/20 transition-all`}
-        >
-          <ChevronLeft size={24} />
-        </button>
+        {/* Navigation */}
+        <div className="flex justify-between items-center mb-8">
+           <button 
+            onClick={onBack}
+            className={`flex items-center gap-1 text-sm font-medium ${contrastText} opacity-80 hover:opacity-100`}
+          >
+            <ChevronLeft size={20} />
+            Back
+          </button>
+          <div className={`text-sm font-bold ${contrastText} opacity-90`}>
+            {color.name}
+          </div>
+          <button className={`${contrastText} opacity-80 hover:opacity-100`}>
+            <Share2 size={20} />
+          </button>
+        </div>
 
-        <div className={`text-center space-y-4 ${contrastText}`}>
-          {ncsData && (
-             <div className="flex items-center gap-8 text-[10px] uppercase font-medium tracking-widest opacity-60">
-                <div className="flex flex-col items-center">
-                  <span>Blackness</span>
-                  <span className="text-xl mt-1">{ncsData.blackness}</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span>Chroma</span>
-                  <span className="text-xl mt-1">{ncsData.chroma}</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span>Hue</span>
-                  <span className="text-xl mt-1">{ncsData.hue}</span>
-                </div>
+        {/* NCS Data Display */}
+        <div className={`flex flex-col items-center justify-center ${contrastText}`}>
+          {isNCS ? (
+            <div className="w-full max-w-sm">
+              {/* Labels */}
+              <div className="flex justify-between text-[10px] font-bold tracking-widest uppercase opacity-60 mb-2 px-8">
+                <span className="w-16 text-center">Blackness</span>
+                <span className="w-16 text-center">Chroma</span>
+                <span className="w-24 text-center">Hue</span>
+              </div>
+              
+              {/* Values */}
+              <div className="flex justify-between items-baseline px-2">
+                 <div className="text-7xl font-light tracking-tighter flex items-baseline">
+                   <span className="text-4xl mr-2 opacity-60">S</span>
+                   {blackness}
+                 </div>
+                 <div className="text-7xl font-light tracking-tighter">
+                   {chroma}
+                 </div>
+                 <div className="text-4xl font-light opacity-60">-</div>
+                 <div className="text-6xl font-light tracking-tight w-28 text-center truncate">
+                   {hue}
+                 </div>
+              </div>
+              
+              <div className="text-center mt-4 text-xs font-medium opacity-50 tracking-widest">
+                nuance & hue
+              </div>
+            </div>
+          ) : (
+             <div className="text-center py-10">
+               <h1 className="text-6xl font-bold tracking-tight mb-2">{color.code}</h1>
+               <p className="text-lg opacity-80">{color.system} Standard</p>
              </div>
           )}
-          
-          <div className="flex items-center justify-center gap-4">
-            <h1 className="text-6xl font-light tracking-tight">{ncsData ? ncsData.blackness : color.code.split(' ')[0]}</h1>
-            {ncsData && <div className="text-6xl font-light">-</div>}
-            <h1 className="text-6xl font-light tracking-tight">{ncsData ? ncsData.hue : (color.code.split(' ')[1] || '')}</h1>
-          </div>
-          
-          {!ncsData && <h1 className="text-4xl font-light tracking-tight">{color.code}</h1>}
-          
-          <div className="text-xs font-medium tracking-widest uppercase opacity-70">
-            {color.system === 'NCS' ? 'Natural Color System' : 'RAL Classic'}
-          </div>
         </div>
       </div>
 
-      {/* Bottom Half - Details & Actions */}
-      <div className="bg-white pb-safe-bottom">
-        <div className="flex border-b border-gray-100">
+      {/* 2. Tabs */}
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-20">
+        <div className="flex">
           <button 
             onClick={() => setActiveTab('details')}
-            className={`flex-1 py-4 text-sm font-semibold transition-colors ${activeTab === 'details' ? 'text-gray-900 border-b-2 border-black' : 'text-gray-400 hover:text-gray-600'}`}
+            className={`flex-1 py-4 text-sm font-semibold text-center border-b-2 transition-colors ${activeTab === 'details' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}
           >
             Details
           </button>
           <button 
-            onClick={() => setActiveTab('material')}
-            className={`flex-1 py-4 text-sm font-semibold transition-colors ${activeTab === 'material' ? 'text-gray-900 border-b-2 border-black' : 'text-gray-400 hover:text-gray-600'}`}
+            onClick={() => setActiveTab('combinations')}
+            className={`flex-1 py-4 text-sm font-semibold text-center border-b-2 transition-colors ${activeTab === 'combinations' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}
           >
-            Material
+            Material Context
           </button>
         </div>
+      </div>
 
-        <div className="p-6 space-y-6 h-[40vh] overflow-y-auto no-scrollbar">
-          {activeTab === 'details' ? (
-            <>
+      {/* 3. Content List */}
+      <div className="flex-1 overflow-y-auto no-scrollbar bg-white safe-area-bottom">
+        {activeTab === 'details' ? (
+          <div className="divide-y divide-gray-100">
+            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
+               <span className="text-gray-500 text-sm">Name</span>
+               <span className="text-gray-900 font-semibold font-mono">{color.code}</span>
+            </div>
+            
+            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
+               <span className="text-gray-500 text-sm">Collection</span>
+               <span className="text-gray-900 font-medium">{color.system} 2050</span>
+            </div>
+
+            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
+               <span className="text-gray-500 text-sm">Vendor</span>
+               <span className="text-gray-900 font-medium">{color.system} Color AB</span>
+            </div>
+
+            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
+               <span className="text-gray-500 text-sm">Category</span>
+               <span className="text-gray-900 font-medium">Reference</span>
+            </div>
+
+             {/* Technical Data Section */}
+             <div className="bg-gray-50/50 px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
+               Technical Data
+             </div>
+
+            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
+               <span className="text-gray-500 text-sm">LRV (D65)</span>
+               <span className="text-gray-900 font-mono font-medium">{color.lrv || "N/A"}</span>
+            </div>
+
+            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
+               <span className="text-gray-500 text-sm">CMYK Coated</span>
+               <span className="text-gray-900 font-mono font-medium">{color.cmyk || "N/A"}</span>
+            </div>
+
+            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
+               <span className="text-gray-500 text-sm">RGB Value</span>
+               <span className="text-gray-900 font-mono font-medium">{color.rgb || "N/A"}</span>
+            </div>
+
+            <div className="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
+               <span className="text-gray-500 text-sm">Hex</span>
+               <span className="text-gray-900 font-mono font-medium">{color.hex}</span>
+            </div>
+          </div>
+        ) : (
+           <div className="p-6 space-y-8">
               <div className="space-y-4">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Properties</h2>
-                <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                  <span className="text-gray-400 font-medium text-sm">Name</span>
-                  <span className="text-gray-900 font-semibold text-right">{color.name}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                  <span className="text-gray-400 font-medium text-sm">System</span>
-                  <span className="text-gray-900 font-semibold">{color.system}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                  <span className="text-gray-400 font-medium text-sm">Hex</span>
-                  <span className="text-gray-900 font-mono text-sm">{color.hex}</span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                 <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                   <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Likely Material</h3>
-                   <div className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                     <Hammer size={24} className="text-gray-600" />
-                     {color.materialGuess}
-                   </div>
-                   <p className="mt-2 text-gray-600 leading-relaxed">
-                     {color.laymanDescription}
-                   </p>
-                 </div>
-                 <div className="space-y-4">
-                    <h2 className="text-lg font-bold text-gray-900">Finish Details</h2>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                      <span className="text-gray-400 font-medium text-sm">Applied To</span>
-                      <span className="text-gray-900 font-semibold">{color.location}</span>
+                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Material Identification</h3>
+                 <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex items-start gap-4">
+                    <div className="bg-white p-3 rounded-full shadow-sm">
+                      <Hammer className="text-gray-700" size={24} />
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                      <span className="text-gray-400 font-medium text-sm">Finish Type</span>
-                      <span className="text-gray-900 font-semibold">{color.finishGuess}</span>
+                    <div>
+                      <div className="font-bold text-gray-900 text-lg">{color.materialGuess}</div>
+                      <div className="text-gray-500 text-sm mt-1">{color.finishGuess}</div>
+                      <p className="text-gray-600 text-sm mt-3 leading-relaxed">
+                        {color.laymanDescription}
+                      </p>
                     </div>
                  </div>
               </div>
-            </>
-          )}
+
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Usage Context</h3>
+                <div className="flex items-center gap-3 p-4 border border-gray-100 rounded-xl">
+                  <div className="w-2 h-8 bg-black rounded-full"></div>
+                  <div>
+                    <span className="text-xs text-gray-400 font-bold uppercase">Location</span>
+                    <div className="font-semibold text-gray-900">{color.location}</div>
+                  </div>
+                </div>
+              </div>
+           </div>
+        )}
+      </div>
+
+      {/* Bottom Actions */}
+      <div className="p-4 border-t border-gray-100 bg-white safe-area-bottom">
+        <button className="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2">
+           <Palette size={18} />
+           <span>Find Similar Colors</span>
+        </button>
+        <div className="mt-2 text-center">
+             <button className="text-gray-400 text-sm font-medium py-2 hover:text-gray-600">
+               Save to folder
+             </button>
         </div>
       </div>
+
     </div>
   );
 };
