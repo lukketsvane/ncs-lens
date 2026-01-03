@@ -1,20 +1,26 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# CMF Lens
 
-# Run and deploy your AI Studio app
+A Progressive Web App (PWA) that uses Artificial Intelligence to analyze product images, identifying materials and matching colors to professional standards like NCS and RAL.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1atn1qzSbLF8Ka6r1uPaMhVKBknfuwlZi
+*   **AI Analysis**: Identifies products, materials, textures, and finishes using Google Gemini.
+*   **Precision Color Matching**: Matches colors to NCS S-Series and RAL Classic standards with lighting correction.
+*   **Technical Specifications**: Provides detailed color data including Light Reflectance Value (LRV), CMYK, RGB, and NCS component breakdowns (Blackness, Chromaticness, Hue).
+*   **Comparison Tool**: Split-screen view to compare scanned colors against standard references or previous history.
+*   **Collection Management**: Saves analysis history locally.
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+*   React 19
+*   TypeScript
+*   Tailwind CSS
+*   Google GenAI SDK (Gemini 3 Flash)
+*   Lucide React
 
+## Roadmap
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+*   Implement user authentication system.
+*   Integrate Google Login.
+*   Create detailed user profile pages to manage collections.
+*   Migrate community features from local storage to a backend database.
