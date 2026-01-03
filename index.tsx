@@ -14,11 +14,11 @@ import {
   Copy, 
   Layers, 
   Eye, 
-  Plus,
-  Trash2,
-  X,
-  Hammer,
-  RefreshCw
+  Plus, 
+  Trash2, 
+  X, 
+  Hammer, 
+  RefreshCw 
 } from "lucide-react";
 
 // --- Types ---
@@ -65,7 +65,7 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
   const responseSchema: Schema = {
     type: Type.OBJECT,
     properties: {
-      productType: { type: Type.STRING, description: "Short product name (e.g. Eames Lounge Chair)" },
+      productType: { type: Type.STRING, description: "Specific product name (e.g. 'Herman Miller Aeron') or precise generic description." },
       materials: {
         type: Type.ARRAY,
         items: {
@@ -83,15 +83,15 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
         items: {
           type: Type.OBJECT,
           properties: {
-            system: { type: Type.STRING, enum: ["RAL", "NCS"], description: "Use NCS for precise nuance, RAL for industrial finishes." },
-            code: { type: Type.STRING, description: "Exact code (e.g. NCS S 2005-Y20R or RAL 9010)." },
+            system: { type: Type.STRING, enum: ["RAL", "NCS"], description: "Use NCS S-Series for architecture/interior, RAL for industrial metal." },
+            code: { type: Type.STRING, description: "The exact standard code (e.g. 'NCS S 2005-Y20R' or 'RAL 9010')." },
             name: { type: Type.STRING, description: "Official color name." },
             hex: { type: Type.STRING, description: "Hexadecimal representation." },
-            location: { type: Type.STRING, description: "Where on the object this color is found." },
+            location: { type: Type.STRING, description: "Specific part of the object (e.g. 'Seat Shell', 'Legs')." },
             confidence: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
-            materialGuess: { type: Type.STRING, description: "Specific material prediction (e.g. 'Stained Oak', 'Anodized Aluminum')." },
-            finishGuess: { type: Type.STRING, description: "Finish type (e.g. 'Satin Varnish', 'Matte Powder Coat')." },
-            laymanDescription: { type: Type.STRING, description: "Simple explanation for non-experts (e.g. 'Looks like painted wood with a soft matte sheen')." }
+            materialGuess: { type: Type.STRING, description: "Precise material identification (e.g. 'Soap Treated Oak', 'Anodized Aluminum')." },
+            finishGuess: { type: Type.STRING, description: "Surface finish (e.g. 'Satin Varnish', 'Matte Powder Coat', 'Brushed')." },
+            laymanDescription: { type: Type.STRING, description: "A sensory description of the look and feel for non-experts." }
           },
           required: ["system", "code", "name", "hex", "location", "confidence", "materialGuess", "finishGuess", "laymanDescription"],
         },
@@ -111,23 +111,33 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
           },
         },
         {
-          text: `You are an expert Color, Material, and Finish (CMF) Designer. Analyze this product image with high precision.
-          
-          1. **Product**: Identify the object.
-          2. **Materials**: Identify distinct materials. Distinguish between natural materials (e.g., Oiled Oak, Soap treated Beech) and coated metals (e.g., Powder Coated Steel, Aluminum).
-          3. **Colors**: 
-             - Provide the closest **NCS 1950** (Natural Color System) code for paints, textiles, and plastics. Use the 'S' prefix if standard (e.g., 'S 2030-Y90R').
-             - Provide **RAL Classic** codes for industrial metal parts if applicable.
-             - For each color, analyze the underlying material and finish to provide a 'laymanDescription'.
-          
-          Be realistic. If a color is a natural material (like wood), find the closest NCS match for that wood tone.`,
+          text: `Act as a world-class Color, Material, and Finish (CMF) Designer. Analyze the uploaded product image with extreme precision for a professional design database.
+
+1. **Product Identification**: Identify the specific design object or describe its style and type accurately.
+
+2. **Material Analysis**: Break down the object into its primary materials. Distinguish subtle differences:
+   - Wood: Is it Oiled Oak, Soap Treated Beech, Walnut Veneer?
+   - Metal: Is it Brushed Aluminum, Chrome Plated Steel, Powder Coated?
+   - Plastic: Is it Matte Polypropylene, High Gloss ABS?
+   - Textile: Is it Wool Felt, Bouclé, Canvas?
+
+3. **Color Matching (Crucial)**:
+   - For **Paints, Plastics, Coatings, Textiles**: You MUST provide the closest **NCS S-series** code (Natural Color System). Format MUST be 'S XXXX-YZZR' (e.g., 'S 2030-Y90R').
+   - For **Industrial Metals**: Provide **RAL Classic** codes (e.g., 'RAL 9005 Jet Black').
+   - For **Natural Materials** (Wood, Stone): Provide the nearest NCS equivalent that matches the visual dominance of the material.
+   
+4. **Contextual Description**:
+   - 'laymanDescription': Explain the surface sensation and look in simple, sensory terms (e.g., "A warm, honey-colored wood with visible grain patterns and a smooth matte touch").
+   - 'finishGuess': Be specific about the reflection and texture (e.g., 'Matte Lacquer', 'Satin', 'High Gloss', 'Raw').
+
+Ensure high accuracy. If the image quality is poor, deduce the likely standard specification for this object type.`,
         },
       ],
     },
     config: {
       responseMimeType: "application/json",
       responseSchema: responseSchema,
-      temperature: 0.4, // Increased slightly to provide variety on regeneration
+      temperature: 0.4, 
     },
   });
 
