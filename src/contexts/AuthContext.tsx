@@ -62,9 +62,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Simulate Google OAuth flow
       // In production, this would use Google Identity Services or Firebase Auth
       
-      // For demo purposes, we'll create a mock user
-      // In production, replace with actual Google Auth:
+      // For demo/development purposes, we'll create a mock user
+      // TODO: Replace with actual Google Auth in production:
       // const googleUser = await google.accounts.id.prompt();
+      
+      // Development mode check - use mock data only in development
+      const isDevelopment = process.env.NODE_ENV !== 'production' || !process.env.GOOGLE_CLIENT_ID;
+      
+      if (!isDevelopment) {
+        console.warn('Google OAuth not configured. Set GOOGLE_CLIENT_ID for production.');
+      }
       
       const mockGoogleUser = {
         sub: 'google_' + Date.now(),
@@ -85,7 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       };
 
       // Store session token (in production, this would be a JWT)
-      const sessionToken = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2);
+      const sessionToken = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2);
       localStorage.setItem(SESSION_STORAGE_KEY, sessionToken);
 
       setUser(newUser);
