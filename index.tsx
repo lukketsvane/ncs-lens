@@ -25,7 +25,8 @@ import {
   Palette,
   Droplet,
   ArrowRightLeft,
-  XCircle
+  XCircle,
+  User
 } from "lucide-react";
 
 // --- Constants ---
@@ -72,7 +73,7 @@ interface HistoryItem {
   author?: string; // New: For community items
 }
 
-type Tab = 'scan' | 'history' | 'community';
+type Tab = 'scan' | 'history' | 'community' | 'profile';
 
 // --- API Helper ---
 
@@ -848,6 +849,14 @@ const App = () => {
           >
             <Globe strokeWidth={activeTab === 'community' ? 2.5 : 2} size={24} />
             <span className="text-[10px] font-medium">Community</span>
+          </button>
+
+          <button 
+            disabled
+            className="flex flex-col items-center gap-1 p-2 opacity-40 cursor-not-allowed"
+          >
+            <User strokeWidth={2} size={24} className="text-gray-400" />
+            <span className="text-[10px] font-medium text-gray-400">Profile</span>
           </button>
         </div>
       </div>

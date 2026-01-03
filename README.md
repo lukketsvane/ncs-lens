@@ -24,3 +24,5 @@ A Progressive Web App (PWA) that uses Artificial Intelligence to analyze product
 *   Integrate Google Login.
 *   Create detailed user profile pages to manage collections.
 *   Migrate community features from local storage to a backend database.
+*   Implement Stripe payment integration for subscriptions.
+*   Implement daily scan quota for free users.
