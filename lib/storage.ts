@@ -54,8 +54,11 @@ export async function uploadImage(
  */
 export async function deleteImage(imageUrl: string, userId: string): Promise<void> {
   // Extract the path from the URL
+  // Supabase storage URLs follow the pattern: {project_url}/storage/v1/object/public/{bucket}/{path}
+  const STORAGE_PATH_PATTERN = /\/storage\/v1\/object\/public\/scans\//;
+  
   const url = new URL(imageUrl);
-  const pathParts = url.pathname.split('/storage/v1/object/public/scans/');
+  const pathParts = url.pathname.split(STORAGE_PATH_PATTERN);
   if (pathParts.length !== 2) {
     console.warn('Could not parse image path from URL');
     return;

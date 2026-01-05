@@ -683,7 +683,6 @@ const App = () => {
           timestamp: new Date(scan.created_at).getTime(),
           image: scan.image_url,
           result: scan.result,
-          author: undefined,
         }));
         setHistory(historyItems);
 
@@ -765,10 +764,14 @@ const App = () => {
       } else {
         // Fetch image from URL and convert to base64
         const response = await fetch(detailItem.image);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+        }
         const blob = await response.blob();
-        const dataUrl = await new Promise<string>((resolve) => {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('Failed to read image data'));
           reader.readAsDataURL(blob);
         });
         base64 = dataUrl.split(",")[1];

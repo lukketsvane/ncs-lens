@@ -57,25 +57,42 @@ export async function getUserScans(userId: string): Promise<ScanRecord[]> {
  * Fetch public scans for community view
  */
 export async function getPublicScans(): Promise<ScanRecord[]> {
-  const { data, error } = await supabase
+  // First fetch public scans
+  const { data: scans, error: scansError } = await supabase
     .from('scans')
-    .select(`
-      *,
-      profiles:user_id (display_name)
-    `)
+    .select('*')
     .eq('is_public', true)
     .order('created_at', { ascending: false })
     .limit(50);
 
-  if (error) {
-    console.error('Error fetching public scans:', error);
+  if (scansError) {
+    console.error('Error fetching public scans:', scansError);
     return [];
   }
 
-  // Add author name from joined profile
-  return (data || []).map((scan: ScanRecord & { profiles?: { display_name: string } }) => ({
+  if (!scans || scans.length === 0) {
+    return [];
+  }
+
+  // Get unique user IDs
+  const userIds = [...new Set(scans.map(s => s.user_id))];
+  
+  // Fetch profiles for these users
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .in('id', userIds);
+
+  // Create a map of user_id to display_name
+  const profileMap = new Map<string, string>();
+  if (profiles) {
+    profiles.forEach(p => profileMap.set(p.id, p.display_name || 'Anonymous'));
+  }
+
+  // Add author name from profile map
+  return scans.map((scan: ScanRecord) => ({
     ...scan,
-    author: scan.profiles?.display_name || 'Anonymous',
+    author: profileMap.get(scan.user_id) || 'Anonymous',
   }));
 }
 
