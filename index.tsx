@@ -666,27 +666,30 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [detailItem, setDetailItem] = useState<HistoryItem | null>(null);
   const [detailColor, setDetailColor] = useState<ColorMatch | null>(null);
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load data from Supabase on mount
   useEffect(() => {
     const loadData = async () => {
-      if (!user) return;
-      
       setDataLoading(true);
       try {
-        // Fetch user's scans
-        const userScans = await getUserScans(user.id);
-        const historyItems: HistoryItem[] = userScans.map((scan: ScanRecord) => ({
-          id: scan.id,
-          timestamp: new Date(scan.created_at).getTime(),
-          image: scan.image_url,
-          result: scan.result,
-        }));
-        setHistory(historyItems);
+        // Fetch user's scans only if logged in
+        if (user) {
+          const userScans = await getUserScans(user.id);
+          const historyItems: HistoryItem[] = userScans.map((scan: ScanRecord) => ({
+            id: scan.id,
+            timestamp: new Date(scan.created_at).getTime(),
+            image: scan.image_url,
+            result: scan.result,
+          }));
+          setHistory(historyItems);
+        } else {
+          setHistory([]);
+        }
 
-        // Fetch public scans for community
+        // Fetch public scans for community (available to everyone)
         const publicScans = await getPublicScans();
         const communityItems: HistoryItem[] = publicScans.map((scan: ScanRecord) => ({
           id: scan.id,
@@ -828,15 +831,6 @@ const App = () => {
   };
 
   // Render
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-[100] flex flex-col items-center justify-center">
-         <Loader2 size={48} className="animate-spin text-black mb-4" />
-         <p className="font-medium animate-pulse text-gray-500">Analyzing materials...</p>
-      </div>
-    );
-  }
-
   if (dataLoading) {
     return (
       <div className="fixed inset-0 bg-white flex items-center justify-center">
@@ -848,6 +842,14 @@ const App = () => {
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-[#111] font-sans">
       
+      {/* Loading Overlay - shown during analysis without hiding UI */}
+      {loading && (
+        <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-[100] flex flex-col items-center justify-center">
+           <Loader2 size={48} className="animate-spin text-black mb-4" />
+           <p className="font-medium animate-pulse text-gray-500">Analyzing materials...</p>
+        </div>
+      )}
+
       {/* --- Main Content Area --- */}
       <main className="h-full">
         {activeTab === 'scan' && (
@@ -859,7 +861,13 @@ const App = () => {
             
             <div className="flex-1 flex flex-col justify-center items-center pb-12">
               <div 
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => {
+                  if (!user) {
+                    setShowAuthPrompt(true);
+                    return;
+                  }
+                  fileInputRef.current?.click();
+                }}
                 className="group relative cursor-pointer bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] shadow-[0_20px_40px_rgba(0,0,0,0.05)] border border-white flex flex-col items-center justify-center gap-8 overflow-hidden transition-all active:scale-[0.98] hover:shadow-[0_25px_50px_rgba(0,0,0,0.08)]"
               >
                 <div className="absolute inset-0 bg-gradient-to-tr from-gray-50 via-white to-gray-50 opacity-50" />
@@ -885,7 +893,7 @@ const App = () => {
             items={history} 
             title="My Collection" 
             onSelect={setDetailItem} 
-            onDelete={handleDelete}
+            onDelete={user ? handleDelete : undefined}
           />
         )}
 
@@ -898,7 +906,7 @@ const App = () => {
         )}
 
         {activeTab === 'profile' && (
-          <ProfilePage />
+          user ? <ProfilePage /> : <AuthPage />
         )}
       </main>
 
@@ -908,8 +916,8 @@ const App = () => {
           item={detailItem} 
           onBack={() => setDetailItem(null)} 
           onColorSelect={setDetailColor}
-          onRegenerate={detailItem.author ? undefined : handleRegenerate} // Only regenerate own items
-          onPublish={detailItem.author ? undefined : handlePublish} // Only publish own items
+          onRegenerate={user && !detailItem.author ? handleRegenerate : undefined} // Only regenerate own items when logged in
+          onPublish={user && !detailItem.author ? handlePublish : undefined} // Only publish own items when logged in
         />
       )}
       
@@ -919,6 +927,41 @@ const App = () => {
           history={history}
           onBack={() => setDetailColor(null)} 
         />
+      )}
+
+      {/* Auth Prompt Modal */}
+      {showAuthPrompt && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <User size={32} className="text-gray-400" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Sign in required</h2>
+              <p className="text-sm text-gray-500">
+                Create an account or sign in to scan and generate color palettes.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setShowAuthPrompt(false);
+                  setActiveTab('profile');
+                }}
+                className="w-full bg-gray-900 text-white font-semibold py-4 rounded-2xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2"
+              >
+                <span>Sign In / Sign Up</span>
+                <ArrowRight size={18} />
+              </button>
+              <button
+                onClick={() => setShowAuthPrompt(false)}
+                className="w-full text-gray-500 font-medium py-3 hover:text-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* --- Bottom Navigation --- */}
@@ -971,7 +1014,7 @@ const App = () => {
 
 // Main wrapper component that handles auth state
 const AppWithAuth = () => {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
 
   if (loading) {
     return (
@@ -981,10 +1024,7 @@ const AppWithAuth = () => {
     );
   }
 
-  if (!user) {
-    return <AuthPage />;
-  }
-
+  // Allow browsing without login - App handles auth checks for specific actions
   return <App />;
 };
 
