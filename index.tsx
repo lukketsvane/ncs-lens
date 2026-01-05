@@ -28,6 +28,11 @@ import {
   XCircle,
   User
 } from "lucide-react";
+import { AuthProvider, useAuth } from "./components/AuthContext";
+import { AuthPage } from "./components/AuthPage";
+import { ProfilePage } from "./components/ProfilePage";
+import { getUserScans, getPublicScans, createScan, updateScan, deleteScan, publishScan, ScanRecord } from "./lib/scans";
+import { uploadImage, deleteImage } from "./lib/storage";
 
 // --- Constants ---
 const EDGE_CONFIG_STORE_ID = "ecfg_xlrdrn2ms13tkf3hezgonww7tpbk"; // Prepared for backend integration
@@ -647,23 +652,15 @@ const GridView = ({
 };
 
 const App = () => {
+  const { user } = useAuth();
+  
   // Navigation State
   const [activeTab, setActiveTab] = useState<Tab>('scan');
   
-  // Data State
-  const [history, setHistory] = useState<HistoryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('cmf_history');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
-  
-  const [communityItems, setCommunityItems] = useState<HistoryItem[]>(() => {
-    // Initial load: Mix curated items with any locally "published" items
-    const localPublished = localStorage.getItem('cmf_community_local');
-    const parsedLocal = localPublished ? JSON.parse(localPublished) : [];
-    return parsedLocal;
-  });
+  // Data State - use Supabase for persistence
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [communityItems, setCommunityItems] = useState<HistoryItem[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
 
   // UI State
   const [loading, setLoading] = useState(false);
@@ -672,10 +669,42 @@ const App = () => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Persistence
+  // Load data from Supabase on mount
   useEffect(() => {
-    localStorage.setItem('cmf_history', JSON.stringify(history));
-  }, [history]);
+    const loadData = async () => {
+      if (!user) return;
+      
+      setDataLoading(true);
+      try {
+        // Fetch user's scans
+        const userScans = await getUserScans(user.id);
+        const historyItems: HistoryItem[] = userScans.map((scan: ScanRecord) => ({
+          id: scan.id,
+          timestamp: new Date(scan.created_at).getTime(),
+          image: scan.image_url,
+          result: scan.result,
+        }));
+        setHistory(historyItems);
+
+        // Fetch public scans for community
+        const publicScans = await getPublicScans();
+        const communityItems: HistoryItem[] = publicScans.map((scan: ScanRecord) => ({
+          id: scan.id,
+          timestamp: new Date(scan.created_at).getTime(),
+          image: scan.image_url,
+          result: scan.result,
+          author: scan.author || 'Anonymous',
+        }));
+        setCommunityItems(communityItems);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user]);
 
   // Handlers
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -684,22 +713,37 @@ const App = () => {
   };
 
   const processFile = (file: File) => {
+    if (!user) return;
+    
     setLoading(true);
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
-        const base64 = (reader.result as string).split(",")[1];
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(",")[1];
+        
+        // Analyze the image
         const result = await analyzeImage(base64);
-        const newItem: HistoryItem = {
-          id: Date.now().toString(),
-          timestamp: Date.now(),
-          image: reader.result as string,
-          result: result
-        };
-        setHistory(prev => [newItem, ...prev]);
-        setDetailItem(newItem);
-        setActiveTab('scan'); // Ensure we are on a tab that makes sense, though detail overlay covers it
+        
+        // Upload image to Supabase Storage
+        const imageUrl = await uploadImage(dataUrl, user.id);
+        
+        // Save scan to database
+        const scan = await createScan(user.id, imageUrl, result);
+        
+        if (scan) {
+          const newItem: HistoryItem = {
+            id: scan.id,
+            timestamp: new Date(scan.created_at).getTime(),
+            image: imageUrl,
+            result: result
+          };
+          setHistory(prev => [newItem, ...prev]);
+          setDetailItem(newItem);
+        }
+        setActiveTab('scan');
       } catch (err) {
+        console.error('Analysis failed:', err);
         alert("Analysis failed. Please try again.");
       } finally {
         setLoading(false);
@@ -709,37 +753,78 @@ const App = () => {
   };
 
   const handleRegenerate = async () => {
-    if (!detailItem) return;
+    if (!detailItem || !user) return;
     setLoading(true);
     try {
-      const base64 = detailItem.image.split(",")[1];
+      // For regeneration, we need to fetch the image and re-analyze
+      // If the image is a URL, fetch it first
+      let base64: string;
+      if (detailItem.image.startsWith('data:')) {
+        base64 = detailItem.image.split(",")[1];
+      } else {
+        // Fetch image from URL and convert to base64
+        const response = await fetch(detailItem.image);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('Failed to read image data'));
+          reader.readAsDataURL(blob);
+        });
+        base64 = dataUrl.split(",")[1];
+      }
+      
       const result = await analyzeImage(base64);
+      
+      // Update in database
+      await updateScan(detailItem.id, { result });
+      
       const updatedItem = { ...detailItem, result, timestamp: Date.now() };
       setDetailItem(updatedItem);
       setHistory(prev => prev.map(item => item.id === detailItem.id ? updatedItem : item));
-    } catch {
+    } catch (err) {
+      console.error('Regeneration failed:', err);
       alert("Regeneration failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!detailItem) return;
-    // Simulate publishing to Edge Config
-    const publishedItem = { ...detailItem, author: "You", id: `pub-${Date.now()}` };
     
-    // Update local community state
-    const newCommunityList = [publishedItem, ...communityItems];
-    setCommunityItems(newCommunityList);
+    // Publish to Supabase
+    const success = await publishScan(detailItem.id);
     
-    // Persist "locally published" items to simulate a server
-    const localOnly = newCommunityList.filter(i => i.author === "You");
-    localStorage.setItem('cmf_community_local', JSON.stringify(localOnly));
+    if (success) {
+      // Add to community items locally
+      const publishedItem = { ...detailItem, author: "You" };
+      setCommunityItems(prev => [publishedItem, ...prev]);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    // Find the item to get image URL for cleanup
+    const item = history.find(h => h.id === id);
     
-    // Optional: Switch to community tab to show it appeared
-    // setActiveTab('community');
-    // setDetailItem(null);
+    // Delete from database
+    const success = await deleteScan(id);
+    
+    if (success) {
+      // Try to delete the image from storage (best effort)
+      if (item && user && !item.image.startsWith('data:')) {
+        try {
+          await deleteImage(item.image, user.id);
+        } catch (err) {
+          console.warn('Failed to delete image from storage:', err);
+        }
+      }
+      
+      setHistory(h => h.filter(i => i.id !== id));
+    }
   };
 
   // Render
@@ -748,6 +833,14 @@ const App = () => {
       <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-[100] flex flex-col items-center justify-center">
          <Loader2 size={48} className="animate-spin text-black mb-4" />
          <p className="font-medium animate-pulse text-gray-500">Analyzing materials...</p>
+      </div>
+    );
+  }
+
+  if (dataLoading) {
+    return (
+      <div className="fixed inset-0 bg-white flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-gray-400" />
       </div>
     );
   }
@@ -792,7 +885,7 @@ const App = () => {
             items={history} 
             title="My Collection" 
             onSelect={setDetailItem} 
-            onDelete={(id) => setHistory(h => h.filter(i => i.id !== id))}
+            onDelete={handleDelete}
           />
         )}
 
@@ -802,6 +895,10 @@ const App = () => {
             title="Discover" 
             onSelect={setDetailItem} 
           />
+        )}
+
+        {activeTab === 'profile' && (
+          <ProfilePage />
         )}
       </main>
 
@@ -852,11 +949,11 @@ const App = () => {
           </button>
 
           <button 
-            disabled
-            className="flex flex-col items-center gap-1 p-2 opacity-40 cursor-not-allowed"
+            onClick={() => setActiveTab('profile')}
+            className={`flex flex-col items-center gap-1 p-2 transition-colors ${activeTab === 'profile' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
           >
-            <User strokeWidth={2} size={24} className="text-gray-400" />
-            <span className="text-[10px] font-medium text-gray-400">Profile</span>
+            <User strokeWidth={activeTab === 'profile' ? 2.5 : 2} size={24} />
+            <span className="text-[10px] font-medium">Profile</span>
           </button>
         </div>
       </div>
@@ -872,5 +969,28 @@ const App = () => {
   );
 };
 
+// Main wrapper component that handles auth state
+const AppWithAuth = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-white flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  return <App />;
+};
+
 const root = createRoot(document.getElementById("root")!);
-root.render(<App />);
+root.render(
+  <AuthProvider>
+    <AppWithAuth />
+  </AuthProvider>
+);
