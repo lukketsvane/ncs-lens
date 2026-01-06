@@ -69,7 +69,7 @@ export async function saveColor(
 /**
  * Remove a saved color
  */
-export async function unsaveColor(userId: string, colorSystem: string, colorCode: string): Promise<boolean> {
+export async function unsaveColor(userId: string, colorSystem: 'NCS' | 'RAL', colorCode: string): Promise<boolean> {
   const { error } = await supabase
     .from('saved_colors')
     .delete()
@@ -88,7 +88,7 @@ export async function unsaveColor(userId: string, colorSystem: string, colorCode
 /**
  * Check if a color is saved
  */
-export async function isColorSaved(userId: string, colorSystem: string, colorCode: string): Promise<boolean> {
+export async function isColorSaved(userId: string, colorSystem: 'NCS' | 'RAL', colorCode: string): Promise<boolean> {
   const { data, error } = await supabase
     .from('saved_colors')
     .select('id')

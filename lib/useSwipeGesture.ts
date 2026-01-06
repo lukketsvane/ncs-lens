@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 
 interface SwipeGestureOptions {
   onSwipeRight?: () => void;
@@ -112,6 +112,15 @@ export function useTapGesture(onTap: () => void, onDoubleTap?: () => void) {
 
     lastTapTime.current = now;
   }, [onTap, onDoubleTap]);
+
+  // Cleanup timeout on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (tapTimeout.current) {
+        clearTimeout(tapTimeout.current);
+      }
+    };
+  }, []);
 
   return { onClick: handleTap };
 }

@@ -66,7 +66,10 @@ const parseColorUrl = (path: string): { system: string; code: string } | null =>
   if (!match) return null;
   
   const system = match[1].toUpperCase();
-  // Convert back: s-1050-y90r -> S 1050-Y90R
+  // Convert URL-safe format back to standard NCS notation:
+  // URL format: s-1050-y90r (lowercase, hyphens for spaces)
+  // NCS format: S 1050-Y90R (uppercase, space after S, hyphen before hue)
+  // Steps: 1) Uppercase all, 2) Replace hyphens with spaces, 3) Fix "S " prefix spacing
   let code = match[2].toUpperCase();
   if (system === 'NCS') {
     code = code.replace(/-/g, ' ').replace(/^S\s+/, 'S ');
@@ -82,6 +85,7 @@ const updateUrl = (path: string) => {
 // --- Constants ---
 const EDGE_CONFIG_STORE_ID = "ecfg_xlrdrn2ms13tkf3hezgonww7tpbk"; // Prepared for backend integration
 const MAX_SIMILAR_COLOR_DISTANCE = 30; // Delta E threshold for "similar" colors
+const DEFAULT_COLOR_HEX = '#888888'; // Default hex for colors loaded from URL before enrichment
 
 // --- Types ---
 
@@ -1423,7 +1427,7 @@ const App = () => {
           system: colorInfo.system as 'NCS' | 'RAL',
           code: colorInfo.code,
           name: colorInfo.code,
-          hex: '#888888', // Default, will be updated
+          hex: DEFAULT_COLOR_HEX,
           location: '-',
           confidence: 'High',
           materialGuess: '-',
