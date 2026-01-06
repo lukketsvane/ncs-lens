@@ -575,22 +575,16 @@ const ColorDetailView = ({
     return hexToNcsApprox(color.hex);
   });
   
-  // Compute display values based on whether wheel tab is active
-  // When wheel tab is active, use wheelColor values for the top color frame
-  const displayHex = activeTab === 'wheel' ? ncsToCss(wheelColor) : color.hex;
-  const displayHexForContrast = activeTab === 'wheel' ? ncsToHex(wheelColor) : color.hex;
+  // Always use the original color values for the top color frame display
+  // The wheel tab is for fine-tuning exploration, but the top frame shows the initial color
+  const displayHex = color.hex;
+  const displayHexForContrast = color.hex;
   const contrastText = getContrastColor(displayHexForContrast);
   
-  // Use API data if available, fallback to regex parsing (or wheel values when wheel tab is active)
-  const blackness = activeTab === 'wheel' 
-    ? Math.round(wheelColor.blackness).toString().padStart(2, '0')
-    : (color.blackness || parseNCSStr(color.code)?.blackness || "--");
-  const chroma = activeTab === 'wheel'
-    ? Math.round(wheelColor.chromaticness).toString().padStart(2, '0')
-    : (color.chromaticness || parseNCSStr(color.code)?.chroma || "--");
-  const hue = activeTab === 'wheel'
-    ? (wheelColor.chromaticness < 2 ? 'N' : degreesToNcsHue(wheelColor.hue))
-    : (color.hue || parseNCSStr(color.code)?.hue || "");
+  // Use API data if available, fallback to regex parsing
+  const blackness = color.blackness || parseNCSStr(color.code)?.blackness || "--";
+  const chroma = color.chromaticness || parseNCSStr(color.code)?.chroma || "--";
+  const hue = color.hue || parseNCSStr(color.code)?.hue || "";
   
   // Calculate similar colors from history and community
   const similarColors = React.useMemo(() => {
@@ -758,7 +752,7 @@ const ColorDetailView = ({
             onClick={() => setActiveTab('wheel')}
             className={`flex-1 py-4 text-sm font-semibold text-center border-b-2 transition-colors ${activeTab === 'wheel' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}
           >
-            Wheel
+            Fine Tune
           </button>
         </div>
       </div>
@@ -1795,7 +1789,7 @@ const App = () => {
           <div className="p-4 pt-safe-top flex flex-col h-screen pb-24">
             <div className="flex items-center gap-2 mb-8 mt-2">
               <span className="w-2 h-6 bg-black rounded-full block"></span>
-              <h1 className="text-xl font-bold tracking-tight">NCS Scanner</h1>
+              <h1 className="text-xl font-bold tracking-tight">NCS Lens</h1>
             </div>
             
             <div className="flex-1 flex flex-col justify-center items-center pb-12">
