@@ -77,7 +77,7 @@ export const generateTrianglePoints = () => {
 // --- Components ---
 
 // HueRing
-interface HueRingProps {
+export interface HueRingProps {
   hue: number;
   onChange: (hue: number) => void;
   size: number;
@@ -85,7 +85,7 @@ interface HueRingProps {
 
 const STEP = 5;
 
-const HueRing: React.FC<HueRingProps> = ({ hue, onChange, size }) => {
+export const HueRing: React.FC<HueRingProps> = ({ hue, onChange, size }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   
@@ -234,13 +234,13 @@ const HueRing: React.FC<HueRingProps> = ({ hue, onChange, size }) => {
 };
 
 // TrianglePicker
-interface TrianglePickerProps {
+export interface TrianglePickerProps {
   color: NCSColor;
   onChange: (s: number, c: number) => void;
   size: number;
 }
 
-const TrianglePicker: React.FC<TrianglePickerProps> = ({ color, onChange, size }) => {
+export const TrianglePicker: React.FC<TrianglePickerProps> = ({ color, onChange, size }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   
