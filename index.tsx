@@ -38,6 +38,7 @@ import { AuthPage } from "./components/AuthPage";
 import { ProfilePage } from "./components/ProfilePage";
 import { getUserScans, getPublicScans, createScan, updateScan, deleteScan, publishScan, unpublishScan, likeScan, unlikeScan, getLikesInfo, ScanRecord } from "./lib/scans";
 import { uploadImage, deleteImage } from "./lib/storage";
+import { HueRing, TrianglePicker, NCSColor, degreesToNcsHue, ncsToCss } from "./ncs-wheel";
 
 // --- Constants ---
 const EDGE_CONFIG_STORE_ID = "ecfg_xlrdrn2ms13tkf3hezgonww7tpbk"; // Prepared for backend integration
@@ -244,9 +245,9 @@ const calculateColorDistance = (hex1: string, hex2: string): number => {
 };
 
 const getContrastColor = (hex: string) => {
-  const r = parseInt(hex.substr(1, 2), 16);
-  const g = parseInt(hex.substr(3, 2), 16);
-  const b = parseInt(hex.substr(5, 2), 16);
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
   const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
   return yiq >= 128 ? 'text-black' : 'text-white';
 };
@@ -262,6 +263,131 @@ const parseNCSStr = (code: string) => {
     };
   }
   return null;
+};
+
+// Convert NCS hue string to degrees (0-360)
+const ncsHueToDegrees = (hueStr: string): number => {
+  if (!hueStr) return 0;
+  const h = hueStr.toUpperCase().trim();
+  
+  // Handle pure hues (N for neutral returns 0)
+  if (h === 'Y') return 0;
+  if (h === 'R') return 90;
+  if (h === 'B') return 180;
+  if (h === 'G') return 270;
+  if (h === 'N') return 0; // Neutral
+  
+  // Parse compound hues like Y20R, R80B, etc.
+  const match = h.match(/([YRBG])(\d+)([YRBG])/);
+  if (match) {
+    const from = match[1];
+    const percent = parseInt(match[2], 10);
+    const to = match[3];
+    
+    const baseAngles: Record<string, number> = { Y: 0, R: 90, B: 180, G: 270 };
+    const base = baseAngles[from] ?? 0;
+    
+    // Calculate direction based on color sequence Y -> R -> B -> G -> Y
+    return (base + (percent / 100) * 90) % 360;
+  }
+  
+  return 0;
+};
+
+// Convert hex color to approximate NCS values
+const hexToNcsApprox = (hex: string): NCSColor => {
+  // Validate hex format
+  if (!hex || !/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+    return { hue: 0, blackness: 30, chromaticness: 40 }; // Default fallback
+  }
+  
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  
+  let h = 0;
+  let s = 0;
+  
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) * 60; break;
+      case g: h = ((b - r) / d + 2) * 60; break;
+      case b: h = ((r - g) / d + 4) * 60; break;
+    }
+  }
+  
+  // Convert CSS hue (0-360) to NCS hue (0-360).
+  // CSS HSL uses: 0=Red, 60=Yellow, 120=Green, 180=Cyan, 240=Blue, 300=Magenta
+  // NCS uses: 0=Yellow, 90=Red, 180=Blue, 270=Green
+  // The mapping transforms between these coordinate systems:
+  // - CSS 0-60 (Red to Yellow) maps to NCS 90-0 (Red to Yellow)
+  // - CSS 60-120 (Yellow to Green) maps to NCS 360-270 (Yellow to Green via full circle)
+  // - CSS 120-240 (Green to Blue) maps to NCS 270-180 (Green to Blue)
+  // - CSS 240-360 (Blue to Red) maps to NCS 180-90 (Blue to Red)
+  let ncsHue = 0;
+  if (h <= 60) {
+    ncsHue = (60 - h) / 60 * 90;
+  } else if (h <= 120) {
+    ncsHue = 270 + (120 - h) / 60 * 90;
+  } else if (h <= 240) {
+    ncsHue = 180 - (h - 120) / 120 * 90;
+  } else {
+    ncsHue = 180 + (360 - h) / 120 * 90;
+  }
+  
+  const blackness = Math.round((1 - l) * 100);
+  const chromaticness = Math.round(s * 100);
+  
+  return {
+    hue: Math.round(ncsHue) % 360,
+    blackness: Math.min(100, Math.max(0, blackness)),
+    chromaticness: Math.min(100, Math.max(0, chromaticness))
+  };
+};
+
+// Convert NCS color to hex string
+const ncsToHex = (color: NCSColor): string => {
+  const hslStr = ncsToCss(color);
+  // Parse HSL string: hsl(h, s%, l%)
+  const match = hslStr.match(/hsl\(([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\)/);
+  if (!match) return '#888888';
+  
+  const h = parseFloat(match[1]) / 360;
+  const s = parseFloat(match[2]) / 100;
+  const l = parseFloat(match[3]) / 100;
+  
+  let r, g, b;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  
+  const toHex = (x: number) => {
+    const hex = Math.round(x * 255).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 };
 
 // --- Components ---
@@ -679,6 +805,7 @@ const ResultView = ({
   // Color edit state
   const [editingColorIndex, setEditingColorIndex] = useState<number | null>(null);
   const [editedColor, setEditedColor] = useState<ColorMatch | null>(null);
+  const [wheelColor, setWheelColor] = useState<NCSColor>({ hue: 0, blackness: 30, chromaticness: 40 });
 
   const handlePublish = async () => {
     if (isPublic || !onPublish) return;
@@ -704,8 +831,22 @@ const ResultView = ({
   };
 
   const handleStartEditColor = (index: number) => {
+    const colorToEdit = result.colors[index];
     setEditingColorIndex(index);
-    setEditedColor({ ...result.colors[index] });
+    setEditedColor({ ...colorToEdit });
+    
+    // Initialize wheel color from the color being edited
+    // First try to parse from NCS code, then fallback to hex approximation
+    const parsed = parseNCSStr(colorToEdit.code);
+    if (parsed && colorToEdit.system === 'NCS') {
+      const hue = ncsHueToDegrees(parsed.hue);
+      const blackness = parseInt(parsed.blackness, 10) || 30;
+      const chromaticness = parseInt(parsed.chroma, 10) || 40;
+      setWheelColor({ hue, blackness, chromaticness });
+    } else {
+      // Fallback: approximate from hex color
+      setWheelColor(hexToNcsApprox(colorToEdit.hex));
+    }
   };
 
   const handleSaveColor = () => {
@@ -876,109 +1017,145 @@ const ResultView = ({
         </div>
       </div>
 
-      {/* Color Edit Modal */}
+      {/* Color Edit Modal with NCS Wheel */}
       {editingColorIndex !== null && editedColor && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[32px] p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-gray-900">Edit Color</h2>
-              <button 
-                onClick={handleCancelEditColor}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Color Preview */}
-            <div 
-              className="w-full h-24 rounded-2xl mb-6 shadow-inner"
-              style={{ backgroundColor: editedColor.hex }}
-            />
-
-            <div className="space-y-4">
-              {/* System */}
-              <div>
-                <label className="text-sm font-medium text-gray-600 block mb-1">System</label>
-                <select
-                  value={editedColor.system}
-                  onChange={(e) => setEditedColor({ ...editedColor, system: e.target.value as 'RAL' | 'NCS' })}
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/10"
-                >
-                  <option value="NCS">NCS</option>
-                  <option value="RAL">RAL</option>
-                </select>
-              </div>
-
-              {/* Code */}
-              <div>
-                <label className="text-sm font-medium text-gray-600 block mb-1">Code</label>
-                <input
-                  type="text"
-                  value={editedColor.code}
-                  onChange={(e) => setEditedColor({ ...editedColor, code: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/10"
-                  placeholder="e.g., S 2060-B50G"
-                />
-              </div>
-
-              {/* Name */}
-              <div>
-                <label className="text-sm font-medium text-gray-600 block mb-1">Name</label>
-                <input
-                  type="text"
-                  value={editedColor.name}
-                  onChange={(e) => setEditedColor({ ...editedColor, name: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/10"
-                  placeholder="Color name"
-                />
-              </div>
-
-              {/* Hex */}
-              <div>
-                <label className="text-sm font-medium text-gray-600 block mb-1">Hex Color</label>
-                <div className="flex gap-2">
-                  <input
-                    type="color"
-                    value={editedColor.hex}
-                    onChange={(e) => setEditedColor({ ...editedColor, hex: e.target.value })}
-                    className="w-12 h-12 rounded-xl cursor-pointer border-0"
-                  />
-                  <input
-                    type="text"
-                    value={editedColor.hex}
-                    onChange={(e) => setEditedColor({ ...editedColor, hex: e.target.value })}
-                    className="flex-1 px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium font-mono focus:outline-none focus:ring-2 focus:ring-black/10"
-                    placeholder="#000000"
-                  />
+        <div className="fixed inset-0 bg-[#f2f2f2] z-[100] flex flex-col animate-in slide-in-from-bottom duration-300">
+          {/* Color Header Strip - matching app styling */}
+          <div 
+            className="w-full pt-10 pb-6 px-6 transition-colors duration-300 relative z-20 shadow-sm"
+            style={{ backgroundColor: ncsToCss(wheelColor) }}
+          >
+            {(() => {
+              const ncsHue = degreesToNcsHue(wheelColor.hue);
+              const sStr = Math.round(wheelColor.blackness).toString().padStart(2, '0');
+              const cStr = Math.round(wheelColor.chromaticness).toString().padStart(2, '0');
+              const isNeutral = wheelColor.chromaticness < 2;
+              const isDark = wheelColor.blackness > 40;
+              const textColor = isDark ? "text-white" : "text-gray-900";
+              const labelColor = isDark ? "text-white/60" : "text-gray-600";
+              const dividerOpacity = isDark ? "opacity-40" : "opacity-20";
+              
+              return (
+                <div className={`max-w-md mx-auto flex items-center justify-between font-sans ${textColor}`}>
+                  <button 
+                    onClick={handleCancelEditColor}
+                    className={`p-2 -ml-2 rounded-full hover:bg-black/10 transition-colors ${textColor}`}
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  <div className="flex flex-col items-center flex-1">
+                    <div className={`flex gap-6 text-[10px] font-bold tracking-widest uppercase mb-1 ${labelColor}`}>
+                      <span>Blackness</span><span>Chroma</span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-4xl font-light">S</span>
+                      <div className="flex gap-2 ml-1">
+                        <span className="text-4xl font-normal tracking-tight">{sStr}</span>
+                        <span className="text-4xl font-normal tracking-tight">{cStr}</span>
+                      </div>
+                      <span className={`text-3xl font-light ${dividerOpacity} mx-2`}>-</span>
+                      <span className="text-3xl font-normal tracking-tight">{isNeutral ? 'N' : ncsHue}</span>
+                    </div>
+                  </div>
+                  <div className="w-10" /> {/* Spacer for symmetry */}
                 </div>
-              </div>
+              );
+            })()}
+          </div>
 
-              {/* Location */}
-              <div>
-                <label className="text-sm font-medium text-gray-600 block mb-1">Location</label>
-                <input
-                  type="text"
-                  value={editedColor.location}
-                  onChange={(e) => setEditedColor({ ...editedColor, location: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/10"
-                  placeholder="e.g., Seat Shell, Frame"
-                />
-              </div>
+          {/* NCS Wheel Container */}
+          <div className="flex-grow flex flex-col items-center justify-center w-full max-w-md mx-auto relative p-4">
+            <div className="relative flex items-center justify-center" style={{ width: 280, height: 280 }}>
+              <HueRing 
+                hue={wheelColor.hue} 
+                onChange={(newHue) => {
+                  // Use functional update to access current state values
+                  setWheelColor(prev => {
+                    const newNcsHue = degreesToNcsHue(newHue);
+                    const sStr = Math.round(prev.blackness).toString().padStart(2, '0');
+                    const cStr = Math.round(prev.chromaticness).toString().padStart(2, '0');
+                    const newCode = `S ${sStr}${cStr}-${newNcsHue}`;
+                    
+                    // Update edited color with new NCS code
+                    setEditedColor(prevColor => prevColor ? { 
+                      ...prevColor, 
+                      code: newCode,
+                      hue: newNcsHue,
+                      system: 'NCS' as const
+                    } : null);
+                    
+                    return { ...prev, hue: newHue };
+                  });
+                }} 
+                size={280} 
+              />
+              <TrianglePicker 
+                color={wheelColor} 
+                onChange={(s, c) => {
+                  // Use functional update to access current state values
+                  setWheelColor(prev => {
+                    const ncsHue = degreesToNcsHue(prev.hue);
+                    const sStr = Math.round(s).toString().padStart(2, '0');
+                    const cStr = Math.round(c).toString().padStart(2, '0');
+                    const newCode = `S ${sStr}${cStr}-${ncsHue}`;
+                    
+                    // Update edited color with new NCS code
+                    setEditedColor(prevColor => prevColor ? { 
+                      ...prevColor, 
+                      code: newCode,
+                      blackness: sStr,
+                      chromaticness: cStr,
+                      system: 'NCS' as const
+                    } : null);
+                    
+                    return { ...prev, blackness: s, chromaticness: c };
+                  });
+                }} 
+                size={220} 
+              />
             </div>
+          </div>
 
-            <div className="flex gap-3 mt-6">
+          {/* Bottom Actions */}
+          <div className="p-4 bg-white border-t border-gray-100 safe-area-bottom">
+            <div className="max-w-md mx-auto flex gap-3">
               <button
                 onClick={handleCancelEditColor}
-                className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+                className="flex-1 py-4 px-4 bg-gray-100 text-gray-700 font-semibold rounded-2xl hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleSaveColor}
-                className="flex-1 py-3 px-4 bg-gray-900 text-white font-semibold rounded-xl hover:bg-black transition-colors"
+                onClick={() => {
+                  // Update the hex color before saving
+                  if (editedColor) {
+                    const hexColor = ncsToHex(wheelColor);
+                    const ncsHue = degreesToNcsHue(wheelColor.hue);
+                    const sStr = Math.round(wheelColor.blackness).toString().padStart(2, '0');
+                    const cStr = Math.round(wheelColor.chromaticness).toString().padStart(2, '0');
+                    const finalColor = {
+                      ...editedColor,
+                      code: `S ${sStr}${cStr}-${ncsHue}`,
+                      blackness: sStr,
+                      chromaticness: cStr,
+                      hue: ncsHue,
+                      hex: hexColor,
+                      system: 'NCS' as const
+                    };
+                    setEditedColor(finalColor);
+                    // Save with updated color
+                    if (onUpdate && editingColorIndex !== null) {
+                      const newColors = [...result.colors];
+                      newColors[editingColorIndex] = finalColor;
+                      onUpdate({ colors: newColors });
+                    }
+                  }
+                  setEditingColorIndex(null);
+                  setEditedColor(null);
+                }}
+                className="flex-1 py-4 px-4 bg-gray-900 text-white font-semibold rounded-2xl hover:bg-black transition-colors"
               >
-                Save
+                Save Color
               </button>
             </div>
           </div>
