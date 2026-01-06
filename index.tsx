@@ -106,7 +106,7 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
   const responseSchema: Schema = {
     type: Type.OBJECT,
     properties: {
-      productType: { type: Type.STRING, description: "Specific product name (e.g. 'Herman Miller Aeron') or precise generic description." },
+      productType: { type: Type.STRING, description: "Specific product name (e.g. 'Herman Miller Aeron Chair') or precise generic description. If recognized, include manufacturer and model." },
       materials: {
         type: Type.ARRAY,
         items: {
@@ -125,8 +125,8 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
           type: Type.OBJECT,
           properties: {
             system: { type: Type.STRING, enum: ["RAL", "NCS"], description: "Use NCS S-Series for architecture/interior, RAL for industrial metal." },
-            code: { type: Type.STRING, description: "The exact standard code (e.g. 'NCS S 2005-Y20R' or 'RAL 9010')." },
-            name: { type: Type.STRING, description: "Official color name." },
+            code: { type: Type.STRING, description: "The exact standard code (e.g. 'NCS S 2005-Y20R' or 'RAL 9010'). Must be a valid, existing code from official NCS or RAL catalogs." },
+            name: { type: Type.STRING, description: "Official color name from NCS or RAL catalog." },
             hex: { type: Type.STRING, description: "Hexadecimal representation." },
             location: { type: Type.STRING, description: "Specific part of the object (e.g. 'Seat Shell', 'Legs')." },
             confidence: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
@@ -149,7 +149,7 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
   };
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3-pro-preview",
     contents: {
       parts: [
         {
@@ -159,24 +159,50 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
           },
         },
         {
-          text: `Act as a precision Colorimeter and CMF Expert. Analyze the image to identify materials and colors with database-level accuracy.
+          text: `You are a precision Colorimeter and CMF (Color, Material, Finish) Expert with access to web search. Your goal is to identify materials and colors with **database-level accuracy**.
 
-**CRITICAL: Lighting Correction**
-Before identifying colors, mathematically compensate for the lighting in the image (e.g., remove yellow cast from warm indoor lights, correct exposure). Identify the *true* underlying color of the object as if viewed under D65 standard daylight.
+**STEP 1: PRODUCT IDENTIFICATION (CRITICAL)**
+First, identify the product in the image:
+- If you recognize a specific product (e.g., furniture brand, car model, electronic device, appliance), use web search to find the **exact official color specifications** from the manufacturer.
+- Search for terms like "[Product Name] color codes", "[Product Name] NCS code", "[Product Name] RAL color", "[Manufacturer] official colors".
+- Many manufacturers publish exact NCS or RAL codes for their products. Find and use these official codes.
 
-**Analysis Steps:**
-1. **Product**: Identify the object.
-2. **Materials**: Analyze surface texture and finish.
-3. **Exact Color Matching**: 
-   - Identify the closest **NCS S-Series** or **RAL Classic** code.
-   - **Precision**: If a wall looks like "white", determine if it's "S 0500-N" (Pure White) or "S 0502-Y" (Standard White). Look for subtle undertones.
-   - **Technical Data**: Provide standard technical specifications (LRV, CMYK) associated with the identified code, NOT just the pixel values.
+**STEP 2: LIGHTING CORRECTION**
+Before identifying colors visually, mathematically compensate for the lighting in the image:
+- Remove yellow/warm cast from indoor tungsten lights
+- Correct for cool LED lighting
+- Account for exposure differences
+Identify the *true* underlying color as if viewed under D65 standard daylight.
+
+**STEP 3: EXACT COLOR MATCHING**
+For each distinct color area:
+- If product was recognized: Use the official manufacturer color codes found via web search.
+- If generic product: Match to the closest **NCS S-Series** or **RAL Classic** code.
+- **PRECISION IS CRITICAL**: 
+  - A "white" wall could be "NCS S 0500-N" (Pure White), "NCS S 0502-Y" (Standard White with yellow undertone), or "NCS S 0502-B" (with blue undertone).
+  - Look for subtle undertones and match precisely.
+  - Only use codes that actually exist in the official NCS or RAL catalogs.
+
+**STEP 4: TECHNICAL DATA**
+Provide standard technical specifications:
+- Use official LRV values from NCS/RAL databases (not estimated from pixels)
+- Include accurate CMYK and RGB conversions
 
 **NCS Notation Rules:**
-- Format: "S BBCC-H" (e.g., S 1050-Y90R).
-- BB = Blackness (00-99).
-- CC = Chromaticness (00-99).
-- H = Hue (e.g., Y, Y10R, R, R80B, B, G).
+- Format: "S BBCC-H" (e.g., NCS S 1050-Y90R)
+- S = Second edition
+- BB = Blackness (00-90, in steps: 00, 05, 10, 15, 20, 30, 40, 50, 60, 70, 80, 85, 90)
+- CC = Chromaticness (00-90, depends on blackness)
+- H = Hue (N for neutral, or: Y, Y10R, Y20R... to G90Y)
+
+**RAL Classic Rules:**
+- Format: "RAL XXXX" (e.g., RAL 9010, RAL 7016)
+- Use 4-digit codes from RAL Classic palette
+
+**Examples of precision:**
+- IKEA Kallax: Often uses NCS S 0500-N or close
+- Herman Miller Aeron: Graphite is approximately RAL 7016
+- Apple products: Often matched to specific Pantone/RAL codes
 
 Return the data in the specified JSON schema.`,
         },
@@ -185,7 +211,8 @@ Return the data in the specified JSON schema.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: responseSchema,
-      temperature: 0.2, // Lower temperature for more deterministic/accurate technical data
+      temperature: 0.1, // Very low temperature for maximum precision and deterministic results
+      tools: [{ googleSearch: {} }], // Enable Google Search for product color lookup
     },
   });
 
