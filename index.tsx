@@ -149,7 +149,7 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
   };
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-pro-preview-05-06",
+    model: "gemini-3-pro-preview",
     contents: {
       parts: [
         {

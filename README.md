@@ -19,7 +19,7 @@ A Progressive Web App (PWA) that uses Artificial Intelligence to analyze product
 *   React 19
 *   TypeScript
 *   Tailwind CSS
-*   Google GenAI SDK (Gemini 2.5 Pro with Google Search grounding)
+*   Google GenAI SDK (Gemini 3 Pro with Google Search grounding)
 *   Supabase (Auth, Database, Storage)
 *   Lucide React
 
