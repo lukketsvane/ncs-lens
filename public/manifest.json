@@ -1,7 +1,7 @@
 {
-  "name": "Material & Color Lens",
-  "short_name": "CMF Lens",
-  "description": "Identify materials and colors with AI",
+  "name": "NCS Scanner - Material & Color Identification",
+  "short_name": "NCS Scanner",
+  "description": "Identify NCS and RAL color codes instantly using AI. Professional CMF analysis tool for designers and architects.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

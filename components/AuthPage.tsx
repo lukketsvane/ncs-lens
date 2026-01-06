@@ -50,7 +50,7 @@ export function AuthPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="w-2 h-6 bg-black rounded-full block"></span>
-            <h1 className="text-2xl font-bold tracking-tight">CMF Lens</h1>
+            <h1 className="text-2xl font-bold tracking-tight">NCS Scanner</h1>
           </div>
           <p className="text-gray-500 text-sm">
             {isSignUp ? 'Create your account' : 'Welcome back'}
