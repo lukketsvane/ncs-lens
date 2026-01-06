@@ -149,7 +149,7 @@ const analyzeImage = async (base64Image: string, salient: boolean = false): Prom
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   // Choose model and config based on salient mode
-  const modelName = salient ? "gemini-2.5-pro" : "gemini-2.5-flash";
+  const modelName = salient ? "gemini-3-pro-preview" : "gemini-3-flash-preview";
   const useWebSearch = salient;
   
   const responseSchema: Schema = {
