@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Mail, LogOut, Loader2, CheckCircle2, Camera, ChevronRight } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
+import { uploadAvatar } from '../lib/storage';
 
 interface Profile {
   id: string;
@@ -14,9 +15,12 @@ export function ProfilePage() {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [displayName, setDisplayName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -41,8 +45,52 @@ export function ProfilePage() {
     if (data) {
       setProfile(data);
       setDisplayName(data.display_name || '');
+      setAvatarUrl(data.avatar_url);
     }
     setLoading(false);
+  };
+
+  const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploadingAvatar(true);
+    try {
+      // Read file as data URL
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const dataUrl = reader.result as string;
+          const url = await uploadAvatar(dataUrl, user.id);
+          
+          // Update profile with new avatar URL
+          const { error } = await supabase
+            .from('profiles')
+            .upsert({
+              id: user.id,
+              avatar_url: url,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'id' });
+
+          if (error) {
+            console.error('Error updating avatar:', error);
+            alert('Failed to update avatar');
+          } else {
+            setAvatarUrl(url);
+            setProfile(prev => prev ? { ...prev, avatar_url: url } : null);
+          }
+        } catch (err) {
+          console.error('Error uploading avatar:', err);
+          alert('Failed to upload avatar');
+        } finally {
+          setUploadingAvatar(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error reading file:', err);
+      setUploadingAvatar(false);
+    }
   };
 
   const updateProfile = async () => {
@@ -92,10 +140,12 @@ export function ProfilePage() {
         <div className="bg-white rounded-[24px] p-6 shadow-sm border border-white">
           <div className="flex items-center gap-4">
             <div className="relative">
-              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center">
-                {profile?.avatar_url ? (
+              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+                {uploadingAvatar ? (
+                  <Loader2 size={24} className="animate-spin text-gray-400" />
+                ) : avatarUrl ? (
                   <img
-                    src={profile.avatar_url}
+                    src={avatarUrl}
                     alt="Avatar"
                     className="w-full h-full rounded-full object-cover"
                   />
@@ -103,9 +153,20 @@ export function ProfilePage() {
                   <User size={32} className="text-gray-400" />
                 )}
               </div>
-              <button className="absolute bottom-0 right-0 p-1.5 bg-gray-900 text-white rounded-full shadow-sm">
+              <button 
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute bottom-0 right-0 p-1.5 bg-gray-900 text-white rounded-full shadow-sm hover:bg-black transition-colors disabled:opacity-50"
+              >
                 <Camera size={12} />
               </button>
+              <input
+                type="file"
+                ref={avatarInputRef}
+                onChange={handleAvatarSelect}
+                accept="image/*"
+                className="hidden"
+              />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="font-bold text-lg text-gray-900 truncate">

@@ -30,16 +30,18 @@ import {
   XCircle,
   User,
   Pencil,
-  Check
+  Check,
+  Heart
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./components/AuthContext";
 import { AuthPage } from "./components/AuthPage";
 import { ProfilePage } from "./components/ProfilePage";
-import { getUserScans, getPublicScans, createScan, updateScan, deleteScan, publishScan, unpublishScan, ScanRecord } from "./lib/scans";
+import { getUserScans, getPublicScans, createScan, updateScan, deleteScan, publishScan, unpublishScan, likeScan, unlikeScan, getLikesInfo, ScanRecord } from "./lib/scans";
 import { uploadImage, deleteImage } from "./lib/storage";
 
 // --- Constants ---
 const EDGE_CONFIG_STORE_ID = "ecfg_xlrdrn2ms13tkf3hezgonww7tpbk"; // Prepared for backend integration
+const MAX_SIMILAR_COLOR_DISTANCE = 30; // Delta E threshold for "similar" colors
 
 // --- Types ---
 
@@ -81,6 +83,8 @@ interface HistoryItem {
   result: AnalysisResult;
   author?: string; // New: For community items
   isPublic?: boolean; // For tracking visibility
+  likeCount?: number; // Number of likes
+  isLiked?: boolean; // Whether current user has liked this
 }
 
 type Tab = 'scan' | 'history' | 'community' | 'profile';
@@ -183,6 +187,62 @@ Return the data in the specified JSON schema.`,
 
 // --- Helper Functions ---
 
+const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+};
+
+// Calculate color distance using CIE76 Delta E formula (simplified)
+// Lower values mean more similar colors
+const calculateColorDistance = (hex1: string, hex2: string): number => {
+  const rgb1 = hexToRgb(hex1);
+  const rgb2 = hexToRgb(hex2);
+  
+  if (!rgb1 || !rgb2) return Infinity;
+  
+  // Convert RGB to LAB color space for more perceptually uniform comparison
+  const rgbToLab = (r: number, g: number, b: number) => {
+    // Normalize RGB to 0-1
+    let rNorm = r / 255;
+    let gNorm = g / 255;
+    let bNorm = b / 255;
+    
+    // Convert to XYZ
+    rNorm = rNorm > 0.04045 ? Math.pow((rNorm + 0.055) / 1.055, 2.4) : rNorm / 12.92;
+    gNorm = gNorm > 0.04045 ? Math.pow((gNorm + 0.055) / 1.055, 2.4) : gNorm / 12.92;
+    bNorm = bNorm > 0.04045 ? Math.pow((bNorm + 0.055) / 1.055, 2.4) : bNorm / 12.92;
+    
+    const x = (rNorm * 0.4124 + gNorm * 0.3576 + bNorm * 0.1805) / 0.95047;
+    const y = (rNorm * 0.2126 + gNorm * 0.7152 + bNorm * 0.0722) / 1.00000;
+    const z = (rNorm * 0.0193 + gNorm * 0.1192 + bNorm * 0.9505) / 1.08883;
+    
+    // Convert to LAB
+    const xLab = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
+    const yLab = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
+    const zLab = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
+    
+    return {
+      l: (116 * yLab) - 16,
+      a: 500 * (xLab - yLab),
+      b: 200 * (yLab - zLab)
+    };
+  };
+  
+  const lab1 = rgbToLab(rgb1.r, rgb1.g, rgb1.b);
+  const lab2 = rgbToLab(rgb2.r, rgb2.g, rgb2.b);
+  
+  // CIE76 Delta E
+  return Math.sqrt(
+    Math.pow(lab2.l - lab1.l, 2) +
+    Math.pow(lab2.a - lab1.a, 2) +
+    Math.pow(lab2.b - lab1.b, 2)
+  );
+};
+
 const getContrastColor = (hex: string) => {
   const r = parseInt(hex.substr(1, 2), 16);
   const g = parseInt(hex.substr(3, 2), 16);
@@ -214,7 +274,14 @@ const CURATED_COMPARISONS: ColorMatch[] = [
   { system: "NCS", code: "S 9000-N", name: "Black", hex: "#212121", location: "-", confidence: "High", materialGuess: "-", finishGuess: "-", laymanDescription: "-", lrv: "5", cmyk: "0,0,0,90", rgb: "33,33,33" },
 ];
 
-const ColorDetailView = ({ color, history, onBack }: { color: ColorMatch, history: HistoryItem[], onBack: () => void }) => {
+interface SimilarColorResult {
+  color: ColorMatch;
+  distance: number;
+  productType: string;
+  source: 'history' | 'community';
+}
+
+const ColorDetailView = ({ color, history, communityItems, onBack }: { color: ColorMatch, history: HistoryItem[], communityItems: HistoryItem[], onBack: () => void }) => {
   const contrastText = getContrastColor(color.hex);
   const isNCS = color.system === 'NCS';
   
@@ -225,6 +292,39 @@ const ColorDetailView = ({ color, history, onBack }: { color: ColorMatch, histor
   
   const [activeTab, setActiveTab] = useState<'details' | 'combinations' | 'compare'>('details');
   const [compareColor, setCompareColor] = useState<ColorMatch | null>(null);
+  const [showSimilarColors, setShowSimilarColors] = useState(false);
+  
+  // Calculate similar colors from history and community
+  const similarColors = React.useMemo(() => {
+    const results: SimilarColorResult[] = [];
+    const seen = new Set<string>();
+    
+    // Helper to process items
+    const processItems = (items: HistoryItem[], source: 'history' | 'community') => {
+      items.forEach(item => {
+        item.result.colors.forEach(c => {
+          if (c.code !== color.code && !seen.has(c.code)) {
+            const distance = calculateColorDistance(color.hex, c.hex);
+            if (distance <= MAX_SIMILAR_COLOR_DISTANCE) {
+              results.push({
+                color: c,
+                distance,
+                productType: item.result.productType,
+                source
+              });
+              seen.add(c.code);
+            }
+          }
+        });
+      });
+    };
+    
+    processItems(history, 'history');
+    processItems(communityItems, 'community');
+    
+    // Sort by distance (most similar first)
+    return results.sort((a, b) => a.distance - b.distance);
+  }, [history, communityItems, color]);
 
   // Derive available colors for comparison
   const comparisonList = React.useMemo(() => {
@@ -278,31 +378,31 @@ const ColorDetailView = ({ color, history, onBack }: { color: ColorMatch, histor
             <div className="w-full max-w-sm">
               {/* Labels - Hide in small split mode */}
               {(!compareColor || activeTab !== 'compare') && (
-                <div className="flex justify-between text-[10px] font-bold tracking-widest uppercase opacity-60 mb-2 px-8">
-                  <span className="w-16 text-center">Blackness</span>
-                  <span className="w-16 text-center">Chroma</span>
-                  <span className="w-24 text-center">Hue</span>
+                <div className="flex justify-between text-[10px] font-bold tracking-widest uppercase opacity-60 mb-2 px-6">
+                  <span className="w-14 text-center">Blackness</span>
+                  <span className="w-14 text-center">Chroma</span>
+                  <span className="w-20 text-center">Hue</span>
                 </div>
               )}
               
-              {/* Values */}
+              {/* Values - Smaller font sizes to prevent truncation */}
               <div className="flex justify-between items-baseline px-2">
-                 <div className="text-7xl font-light tracking-tighter flex items-baseline">
-                   <span className="text-4xl mr-2 opacity-60">S</span>
+                 <div className="text-5xl sm:text-6xl font-light tracking-tighter flex items-baseline">
+                   <span className="text-3xl mr-1 opacity-60">S</span>
                    {blackness}
                  </div>
-                 <div className="text-7xl font-light tracking-tighter">
+                 <div className="text-5xl sm:text-6xl font-light tracking-tighter">
                    {chroma}
                  </div>
-                 <div className="text-4xl font-light opacity-60">-</div>
-                 <div className="text-6xl font-light tracking-tight w-28 text-center truncate">
+                 <div className="text-3xl font-light opacity-60">-</div>
+                 <div className="text-4xl sm:text-5xl font-light tracking-tight w-24 text-center">
                    {hue}
                  </div>
               </div>
             </div>
           ) : (
              <div className="text-center py-4">
-               <h1 className="text-6xl font-bold tracking-tight mb-2">{color.code}</h1>
+               <h1 className="text-5xl font-bold tracking-tight mb-2">{color.code}</h1>
                <p className="text-lg opacity-80">{color.system} Standard</p>
              </div>
           )}
@@ -458,12 +558,89 @@ const ColorDetailView = ({ color, history, onBack }: { color: ColorMatch, histor
       </div>
 
       {/* Bottom Actions - Hide in compare mode to maximize space */}
-      {!(activeTab === 'compare' && compareColor) && (
+      {!(activeTab === 'compare' && compareColor) && !showSimilarColors && (
         <div className="p-4 border-t border-gray-100 bg-white safe-area-bottom">
-          <button className="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2">
+          <button 
+            onClick={() => setShowSimilarColors(true)}
+            className="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2"
+          >
             <Palette size={18} />
-            <span>Find Similar Colors</span>
+            <span>Find Similar Colors ({similarColors.length})</span>
           </button>
+        </div>
+      )}
+
+      {/* Similar Colors Overlay */}
+      {showSimilarColors && (
+        <div className="absolute inset-0 bg-white z-30 flex flex-col animate-in slide-in-from-bottom duration-300">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-100">
+            <button 
+              onClick={() => setShowSimilarColors(false)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <h2 className="font-semibold text-gray-900">Similar Colors</h2>
+            <div className="w-10" />
+          </div>
+
+          {/* Reference Color */}
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div 
+                className="w-12 h-12 rounded-xl shadow-sm border border-gray-200" 
+                style={{ backgroundColor: color.hex }} 
+              />
+              <div>
+                <p className="font-semibold text-gray-900">{color.code}</p>
+                <p className="text-sm text-gray-500">{color.name}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Similar Colors List */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {similarColors.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <Palette size={48} className="mb-4 opacity-20" />
+                <p>No similar colors found</p>
+                <p className="text-sm mt-1">Try scanning more items!</p>
+              </div>
+            ) : (
+              similarColors.map((item, i) => (
+                <div 
+                  key={i}
+                  className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors"
+                >
+                  <div 
+                    className="w-14 h-14 rounded-xl shadow-sm border border-gray-200 flex-shrink-0" 
+                    style={{ backgroundColor: item.color.hex }} 
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-gray-900">{item.color.code}</p>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                        item.source === 'history' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'bg-green-100 text-green-700'
+                      }`}>
+                        {item.source === 'history' ? 'Your Scans' : 'Community'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 truncate">{item.color.name}</p>
+                    <p className="text-xs text-gray-400 mt-1">From: {item.productType}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400">Match</p>
+                    <p className="font-semibold text-gray-900">
+                      {Math.round(100 - (item.distance / MAX_SIMILAR_COLOR_DISTANCE) * 100)}%
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -498,6 +675,10 @@ const ResultView = ({
   // Edit state
   const [editingProductType, setEditingProductType] = useState(false);
   const [editedProductType, setEditedProductType] = useState(result.productType);
+  
+  // Color edit state
+  const [editingColorIndex, setEditingColorIndex] = useState<number | null>(null);
+  const [editedColor, setEditedColor] = useState<ColorMatch | null>(null);
 
   const handlePublish = async () => {
     if (isPublic || !onPublish) return;
@@ -520,6 +701,26 @@ const ResultView = ({
       onUpdate({ productType: editedProductType });
     }
     setEditingProductType(false);
+  };
+
+  const handleStartEditColor = (index: number) => {
+    setEditingColorIndex(index);
+    setEditedColor({ ...result.colors[index] });
+  };
+
+  const handleSaveColor = () => {
+    if (onUpdate && editedColor && editingColorIndex !== null) {
+      const newColors = [...result.colors];
+      newColors[editingColorIndex] = editedColor;
+      onUpdate({ colors: newColors });
+    }
+    setEditingColorIndex(null);
+    setEditedColor(null);
+  };
+
+  const handleCancelEditColor = () => {
+    setEditingColorIndex(null);
+    setEditedColor(null);
   };
 
   return (
@@ -637,6 +838,14 @@ const ResultView = ({
                      <span className="text-[10px] font-bold tracking-widest uppercase bg-black/10 backdrop-blur-sm px-2 py-1 rounded-lg border border-white/10">{color.system}</span>
                      
                      <div className="flex items-center gap-2">
+                        {isOwner && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleStartEditColor(i); }}
+                            className="p-1.5 rounded-full hover:bg-black/10 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Pencil size={14} className={textColorClass === 'text-black' ? 'text-black/60' : 'text-white/80'} />
+                          </button>
+                        )}
                         {onRegenerate && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
@@ -666,6 +875,115 @@ const ResultView = ({
           </div>
         </div>
       </div>
+
+      {/* Color Edit Modal */}
+      {editingColorIndex !== null && editedColor && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold text-gray-900">Edit Color</h2>
+              <button 
+                onClick={handleCancelEditColor}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Color Preview */}
+            <div 
+              className="w-full h-24 rounded-2xl mb-6 shadow-inner"
+              style={{ backgroundColor: editedColor.hex }}
+            />
+
+            <div className="space-y-4">
+              {/* System */}
+              <div>
+                <label className="text-sm font-medium text-gray-600 block mb-1">System</label>
+                <select
+                  value={editedColor.system}
+                  onChange={(e) => setEditedColor({ ...editedColor, system: e.target.value as 'RAL' | 'NCS' })}
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/10"
+                >
+                  <option value="NCS">NCS</option>
+                  <option value="RAL">RAL</option>
+                </select>
+              </div>
+
+              {/* Code */}
+              <div>
+                <label className="text-sm font-medium text-gray-600 block mb-1">Code</label>
+                <input
+                  type="text"
+                  value={editedColor.code}
+                  onChange={(e) => setEditedColor({ ...editedColor, code: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/10"
+                  placeholder="e.g., S 2060-B50G"
+                />
+              </div>
+
+              {/* Name */}
+              <div>
+                <label className="text-sm font-medium text-gray-600 block mb-1">Name</label>
+                <input
+                  type="text"
+                  value={editedColor.name}
+                  onChange={(e) => setEditedColor({ ...editedColor, name: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/10"
+                  placeholder="Color name"
+                />
+              </div>
+
+              {/* Hex */}
+              <div>
+                <label className="text-sm font-medium text-gray-600 block mb-1">Hex Color</label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={editedColor.hex}
+                    onChange={(e) => setEditedColor({ ...editedColor, hex: e.target.value })}
+                    className="w-12 h-12 rounded-xl cursor-pointer border-0"
+                  />
+                  <input
+                    type="text"
+                    value={editedColor.hex}
+                    onChange={(e) => setEditedColor({ ...editedColor, hex: e.target.value })}
+                    className="flex-1 px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium font-mono focus:outline-none focus:ring-2 focus:ring-black/10"
+                    placeholder="#000000"
+                  />
+                </div>
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className="text-sm font-medium text-gray-600 block mb-1">Location</label>
+                <input
+                  type="text"
+                  value={editedColor.location}
+                  onChange={(e) => setEditedColor({ ...editedColor, location: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/10"
+                  placeholder="e.g., Seat Shell, Frame"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleCancelEditColor}
+                className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveColor}
+                className="flex-1 py-3 px-4 bg-gray-900 text-white font-semibold rounded-xl hover:bg-black transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -676,13 +994,17 @@ const GridView = ({
   title, 
   onSelect,
   onDelete,
-  enableSearch = false
+  onLike,
+  enableSearch = false,
+  showLikes = false
 }: { 
   items: HistoryItem[], 
   title: string, 
   onSelect: (item: HistoryItem) => void,
   onDelete?: (id: string) => void,
-  enableSearch?: boolean
+  onLike?: (id: string, isLiked: boolean) => void,
+  enableSearch?: boolean,
+  showLikes?: boolean
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -788,10 +1110,33 @@ const GridView = ({
                </div>
                <div className="min-w-0">
                   <h3 className="font-bold text-gray-900 text-sm truncate leading-tight">{item.result.productType}</h3>
-                  <div className="flex items-center gap-1 mt-2">
-                    {item.result.colors.slice(0, 3).map((c, i) => (
-                      <div key={i} className="w-3 h-3 rounded-full border border-black/5" style={{backgroundColor: c.hex}} />
-                    ))}
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-1">
+                      {item.result.colors.slice(0, 3).map((c, i) => (
+                        <div key={i} className="w-3 h-3 rounded-full border border-black/5" style={{backgroundColor: c.hex}} />
+                      ))}
+                    </div>
+                    {showLikes && onLike && (
+                      <button
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          onLike(item.id, item.isLiked ?? false); 
+                        }}
+                        className={`flex items-center gap-1 text-xs transition-colors ${
+                          item.isLiked 
+                            ? 'text-red-500' 
+                            : 'text-gray-400 hover:text-red-400'
+                        }`}
+                      >
+                        <Heart 
+                          size={14} 
+                          fill={item.isLiked ? 'currentColor' : 'none'}
+                        />
+                        {(item.likeCount ?? 0) > 0 && (
+                          <span>{item.likeCount}</span>
+                        )}
+                      </button>
+                    )}
                   </div>
                   {item.author && <p className="text-[10px] text-gray-400 mt-2">by {item.author}</p>}
                </div>
@@ -844,14 +1189,24 @@ const App = () => {
 
         // Fetch public scans for community (available to everyone)
         const publicScans = await getPublicScans();
-        const communityItems: HistoryItem[] = publicScans.map((scan: ScanRecord) => ({
-          id: scan.id,
-          timestamp: new Date(scan.created_at).getTime(),
-          image: scan.image_url,
-          result: scan.result,
-          author: scan.author || 'Anonymous',
-          isPublic: true,
-        }));
+        const scanIds = publicScans.map(s => s.id);
+        
+        // Fetch likes info for all community scans
+        const likesInfo = await getLikesInfo(scanIds, user?.id);
+        
+        const communityItems: HistoryItem[] = publicScans.map((scan: ScanRecord) => {
+          const likeInfo = likesInfo.get(scan.id) || { count: 0, liked: false };
+          return {
+            id: scan.id,
+            timestamp: new Date(scan.created_at).getTime(),
+            image: scan.image_url,
+            result: scan.result,
+            author: scan.author || 'Anonymous',
+            isPublic: true,
+            likeCount: likeInfo.count,
+            isLiked: likeInfo.liked,
+          };
+        });
         setCommunityItems(communityItems);
       } catch (error) {
         console.error('Error loading data:', error);
@@ -1030,6 +1385,44 @@ const App = () => {
     }
   };
 
+  const handleLike = async (scanId: string, isCurrentlyLiked: boolean) => {
+    if (!user) {
+      setShowAuthPrompt(true);
+      return;
+    }
+
+    // Optimistic update
+    setCommunityItems(prev => prev.map(item => {
+      if (item.id === scanId) {
+        return {
+          ...item,
+          isLiked: !isCurrentlyLiked,
+          likeCount: (item.likeCount ?? 0) + (isCurrentlyLiked ? -1 : 1)
+        };
+      }
+      return item;
+    }));
+
+    // Make API call
+    const success = isCurrentlyLiked 
+      ? await unlikeScan(scanId, user.id)
+      : await likeScan(scanId, user.id);
+
+    // Revert on failure
+    if (!success) {
+      setCommunityItems(prev => prev.map(item => {
+        if (item.id === scanId) {
+          return {
+            ...item,
+            isLiked: isCurrentlyLiked,
+            likeCount: (item.likeCount ?? 0) + (isCurrentlyLiked ? 1 : -1)
+          };
+        }
+        return item;
+      }));
+    }
+  };
+
   // Render
   if (dataLoading) {
     return (
@@ -1102,7 +1495,9 @@ const App = () => {
             items={communityItems} 
             title="Discover" 
             onSelect={setDetailItem}
+            onLike={handleLike}
             enableSearch={true}
+            showLikes={true}
           />
         )}
 
@@ -1129,6 +1524,7 @@ const App = () => {
         <ColorDetailView 
           color={detailColor} 
           history={history}
+          communityItems={communityItems}
           onBack={() => setDetailColor(null)} 
         />
       )}
