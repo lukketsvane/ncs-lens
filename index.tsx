@@ -37,7 +37,8 @@ import {
   TrendingUp,
   Clock,
   Flame,
-  ChevronDown
+  ChevronDown,
+  Zap
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./components/AuthContext";
 import { AuthPage } from "./components/AuthPage";
@@ -144,8 +145,12 @@ type SortOption = 'trending' | 'newest' | 'most_liked';
 
 // --- API Helper ---
 
-const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
+const analyzeImage = async (base64Image: string, salient: boolean = false): Promise<AnalysisResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  // Choose model and config based on salient mode
+  const modelName = salient ? "gemini-2.5-pro" : "gemini-2.5-flash";
+  const useWebSearch = salient;
   
   const responseSchema: Schema = {
     type: Type.OBJECT,
@@ -192,24 +197,15 @@ const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
     required: ["productType", "materials", "colors"],
   };
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            data: base64Image,
-            mimeType: "image/jpeg",
-          },
-        },
-        {
-          text: `You are a precision Colorimeter and CMF (Color, Material, Finish) Expert with access to web search. Your goal is to identify materials and colors with **database-level accuracy**.
+  // Build prompt text - mention web search only if enabled
+  const promptText = `You are a precision Colorimeter and CMF (Color, Material, Finish) Expert${useWebSearch ? ' with access to web search' : ''}. Your goal is to identify materials and colors with **database-level accuracy**.
 
 **STEP 1: PRODUCT IDENTIFICATION (CRITICAL)**
 First, identify the product in the image:
-- If you recognize a specific product (e.g., furniture brand, car model, electronic device, appliance), use web search to find the **exact official color specifications** from the manufacturer.
+${useWebSearch ? `- If you recognize a specific product (e.g., furniture brand, car model, electronic device, appliance), use web search to find the **exact official color specifications** from the manufacturer.
 - Search for terms like "[Product Name] color codes", "[Product Name] NCS code", "[Product Name] RAL color", "[Manufacturer] official colors".
-- Many manufacturers publish exact NCS or RAL codes for their products. Find and use these official codes.
+- Many manufacturers publish exact NCS or RAL codes for their products. Find and use these official codes.` : `- If you recognize a specific product (e.g., furniture brand, car model, electronic device, appliance), identify it accurately.
+- Use your knowledge of common manufacturer color specifications when available.`}
 
 **STEP 2: LIGHTING CORRECTION**
 Before identifying colors visually, mathematically compensate for the lighting in the image:
@@ -220,7 +216,7 @@ Identify the *true* underlying color as if viewed under D65 standard daylight.
 
 **STEP 3: EXACT COLOR MATCHING**
 For each distinct color area:
-- If product was recognized: Use the official manufacturer color codes found via web search.
+${useWebSearch ? '- If product was recognized: Use the official manufacturer color codes found via web search.' : '- If product was recognized: Use known manufacturer color codes if available.'}
 - If generic product: Match to the closest **NCS S-Series** or **RAL Classic** code.
 - **PRECISION IS CRITICAL**: 
   - A "white" wall could be "NCS S 0500-N" (Pure White), "NCS S 0502-Y" (Standard White with yellow undertone), or "NCS S 0502-B" (with blue undertone).
@@ -248,7 +244,20 @@ Provide standard technical specifications:
 - Herman Miller Aeron: Graphite is approximately RAL 7016
 - Apple products: Often matched to specific Pantone/RAL codes
 
-Return the data in the specified JSON schema.`,
+Return the data in the specified JSON schema.`;
+
+  const response = await ai.models.generateContent({
+    model: modelName,
+    contents: {
+      parts: [
+        {
+          inlineData: {
+            data: base64Image,
+            mimeType: "image/jpeg",
+          },
+        },
+        {
+          text: promptText,
         },
       ],
     },
@@ -256,7 +265,7 @@ Return the data in the specified JSON schema.`,
       responseMimeType: "application/json",
       responseSchema: responseSchema,
       temperature: 0.1, // Very low temperature for maximum precision and deterministic results
-      tools: [{ googleSearch: {} }], // Enable Google Search for product color lookup
+      ...(useWebSearch && { tools: [{ googleSearch: {} }] }), // Enable Google Search only in salient mode
     },
   });
 
@@ -1342,7 +1351,7 @@ const GridView = ({
   ];
 
   return (
-    <div className="min-h-full p-4 pb-24 safe-area-top">
+    <div className="min-h-full p-4 pt-8 pb-24 safe-area-top">
        <div className="flex items-center justify-between mb-4 px-1">
          {showSearch ? (
            <div className="flex-1 flex items-center gap-2">
@@ -1565,6 +1574,7 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [detailItem, setDetailItem] = useState<HistoryItem | null>(null);
   const [detailColor, setDetailColor] = useState<ColorMatch | null>(null);
+  const [salientMode, setSalientMode] = useState(false); // Salient mode: uses gemini-pro-3 with web search
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1674,7 +1684,7 @@ const App = () => {
         const base64 = dataUrl.split(",")[1];
         
         // Analyze the image
-        const result = await analyzeImage(base64);
+        const result = await analyzeImage(base64, salientMode);
         
         // Upload image to Supabase Storage
         const imageUrl = await uploadImage(dataUrl, user.id);
@@ -1729,7 +1739,7 @@ const App = () => {
         base64 = dataUrl.split(",")[1];
       }
       
-      const result = await analyzeImage(base64);
+      const result = await analyzeImage(base64, salientMode);
       
       // Update in database
       await updateScan(detailItem.id, { result });
@@ -2000,6 +2010,28 @@ const App = () => {
                   </div>
                 </div>
               )}
+              
+              {/* Salient Mode Toggle - only show when logged in */}
+              {user && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSalientMode(!salientMode);
+                  }}
+                  className={`mt-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    salientMode 
+                      ? 'bg-amber-100 text-amber-700 border border-amber-200' 
+                      : 'bg-gray-100 text-gray-500 border border-gray-200'
+                  }`}
+                >
+                  <Zap size={12} className={salientMode ? 'text-amber-500' : 'text-gray-400'} />
+                  <span>Salient</span>
+                  <div className={`w-6 h-3.5 rounded-full transition-colors ${salientMode ? 'bg-amber-400' : 'bg-gray-300'} relative`}>
+                    <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow-sm transition-transform ${salientMode ? 'translate-x-3' : 'translate-x-0.5'}`} />
+                  </div>
+                </button>
+              )}
+              
               <p className="mt-8 text-center text-sm text-gray-400 max-w-[260px] leading-relaxed">
                 Take a photo to identify NCS/RAL codes and material finishes instantly.
               </p>
