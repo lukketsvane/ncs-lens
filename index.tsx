@@ -183,6 +183,62 @@ Return the data in the specified JSON schema.`,
 
 // --- Helper Functions ---
 
+const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+};
+
+// Calculate color distance using CIE76 Delta E formula (simplified)
+// Lower values mean more similar colors
+const calculateColorDistance = (hex1: string, hex2: string): number => {
+  const rgb1 = hexToRgb(hex1);
+  const rgb2 = hexToRgb(hex2);
+  
+  if (!rgb1 || !rgb2) return Infinity;
+  
+  // Convert RGB to LAB color space for more perceptually uniform comparison
+  const rgbToLab = (r: number, g: number, b: number) => {
+    // Normalize RGB to 0-1
+    let rNorm = r / 255;
+    let gNorm = g / 255;
+    let bNorm = b / 255;
+    
+    // Convert to XYZ
+    rNorm = rNorm > 0.04045 ? Math.pow((rNorm + 0.055) / 1.055, 2.4) : rNorm / 12.92;
+    gNorm = gNorm > 0.04045 ? Math.pow((gNorm + 0.055) / 1.055, 2.4) : gNorm / 12.92;
+    bNorm = bNorm > 0.04045 ? Math.pow((bNorm + 0.055) / 1.055, 2.4) : bNorm / 12.92;
+    
+    const x = (rNorm * 0.4124 + gNorm * 0.3576 + bNorm * 0.1805) / 0.95047;
+    const y = (rNorm * 0.2126 + gNorm * 0.7152 + bNorm * 0.0722) / 1.00000;
+    const z = (rNorm * 0.0193 + gNorm * 0.1192 + bNorm * 0.9505) / 1.08883;
+    
+    // Convert to LAB
+    const xLab = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
+    const yLab = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
+    const zLab = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
+    
+    return {
+      l: (116 * yLab) - 16,
+      a: 500 * (xLab - yLab),
+      b: 200 * (yLab - zLab)
+    };
+  };
+  
+  const lab1 = rgbToLab(rgb1.r, rgb1.g, rgb1.b);
+  const lab2 = rgbToLab(rgb2.r, rgb2.g, rgb2.b);
+  
+  // CIE76 Delta E
+  return Math.sqrt(
+    Math.pow(lab2.l - lab1.l, 2) +
+    Math.pow(lab2.a - lab1.a, 2) +
+    Math.pow(lab2.b - lab1.b, 2)
+  );
+};
+
 const getContrastColor = (hex: string) => {
   const r = parseInt(hex.substr(1, 2), 16);
   const g = parseInt(hex.substr(3, 2), 16);
@@ -214,7 +270,14 @@ const CURATED_COMPARISONS: ColorMatch[] = [
   { system: "NCS", code: "S 9000-N", name: "Black", hex: "#212121", location: "-", confidence: "High", materialGuess: "-", finishGuess: "-", laymanDescription: "-", lrv: "5", cmyk: "0,0,0,90", rgb: "33,33,33" },
 ];
 
-const ColorDetailView = ({ color, history, onBack }: { color: ColorMatch, history: HistoryItem[], onBack: () => void }) => {
+interface SimilarColorResult {
+  color: ColorMatch;
+  distance: number;
+  productType: string;
+  source: 'history' | 'community';
+}
+
+const ColorDetailView = ({ color, history, communityItems, onBack }: { color: ColorMatch, history: HistoryItem[], communityItems: HistoryItem[], onBack: () => void }) => {
   const contrastText = getContrastColor(color.hex);
   const isNCS = color.system === 'NCS';
   
@@ -225,6 +288,40 @@ const ColorDetailView = ({ color, history, onBack }: { color: ColorMatch, histor
   
   const [activeTab, setActiveTab] = useState<'details' | 'combinations' | 'compare'>('details');
   const [compareColor, setCompareColor] = useState<ColorMatch | null>(null);
+  const [showSimilarColors, setShowSimilarColors] = useState(false);
+  
+  // Calculate similar colors from history and community
+  const similarColors = React.useMemo(() => {
+    const results: SimilarColorResult[] = [];
+    const seen = new Set<string>();
+    const MAX_DISTANCE = 30; // Delta E threshold for "similar" colors
+    
+    // Helper to process items
+    const processItems = (items: HistoryItem[], source: 'history' | 'community') => {
+      items.forEach(item => {
+        item.result.colors.forEach(c => {
+          if (c.code !== color.code && !seen.has(c.code)) {
+            const distance = calculateColorDistance(color.hex, c.hex);
+            if (distance <= MAX_DISTANCE) {
+              results.push({
+                color: c,
+                distance,
+                productType: item.result.productType,
+                source
+              });
+              seen.add(c.code);
+            }
+          }
+        });
+      });
+    };
+    
+    processItems(history, 'history');
+    processItems(communityItems, 'community');
+    
+    // Sort by distance (most similar first)
+    return results.sort((a, b) => a.distance - b.distance);
+  }, [history, communityItems, color]);
 
   // Derive available colors for comparison
   const comparisonList = React.useMemo(() => {
