@@ -31,7 +31,13 @@ import {
   User,
   Pencil,
   Check,
-  Heart
+  Heart,
+  Grid3X3,
+  LayoutGrid,
+  TrendingUp,
+  Clock,
+  Flame,
+  ChevronDown
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./components/AuthContext";
 import { AuthPage } from "./components/AuthPage";
@@ -132,6 +138,9 @@ interface HistoryItem {
 }
 
 type Tab = 'scan' | 'history' | 'community' | 'profile';
+
+// Sort options for community view
+type SortOption = 'trending' | 'newest' | 'most_liked';
 
 // --- API Helper ---
 
@@ -575,16 +584,26 @@ const ColorDetailView = ({
     return hexToNcsApprox(color.hex);
   });
   
-  // Always use the original color values for the top color frame display
-  // The wheel tab is for fine-tuning exploration, but the top frame shows the initial color
-  const displayHex = color.hex;
-  const displayHexForContrast = color.hex;
+  // When on the wheel tab, show the wheel color in the top display
+  // Otherwise, show the original color (prevents color changing when navigating tabs)
+  const isWheelTabActive = activeTab === 'wheel';
+  const displayHex = isWheelTabActive ? ncsToHex(wheelColor) : color.hex;
+  const displayHexForContrast = displayHex;
   const contrastText = getContrastColor(displayHexForContrast);
   
-  // Use API data if available, fallback to regex parsing
-  const blackness = color.blackness || parseNCSStr(color.code)?.blackness || "--";
-  const chroma = color.chromaticness || parseNCSStr(color.code)?.chroma || "--";
-  const hue = color.hue || parseNCSStr(color.code)?.hue || "";
+  // Helper to format NCS numeric values with 2-digit padding
+  const formatNcsValue = (value: number): string => String(Math.round(value)).padStart(2, '0');
+  
+  // Use wheel color values when on wheel tab, otherwise use API data or regex parsing
+  const blackness = isWheelTabActive 
+    ? formatNcsValue(wheelColor.blackness)
+    : (color.blackness || parseNCSStr(color.code)?.blackness || "--");
+  const chroma = isWheelTabActive 
+    ? formatNcsValue(wheelColor.chromaticness)
+    : (color.chromaticness || parseNCSStr(color.code)?.chroma || "--");
+  const hue = isWheelTabActive 
+    ? degreesToNcsHue(wheelColor.hue)
+    : (color.hue || parseNCSStr(color.code)?.hue || "");
   
   // Calculate similar colors from history and community
   const similarColors = React.useMemo(() => {
@@ -1238,7 +1257,9 @@ const GridView = ({
   onDelete,
   onLike,
   enableSearch = false,
-  showLikes = false
+  showLikes = false,
+  enableSort = false,
+  enableViewToggle = false
 }: { 
   items: HistoryItem[], 
   title: string, 
@@ -1246,42 +1267,83 @@ const GridView = ({
   onDelete?: (id: string) => void,
   onLike?: (id: string, isLiked: boolean) => void,
   enableSearch?: boolean,
-  showLikes?: boolean
+  showLikes?: boolean,
+  enableSort?: boolean,
+  enableViewToggle?: boolean
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('trending');
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [paletteView, setPaletteView] = useState(false); // false = card view with image, true = palette only
 
-  // Filter items based on search query
-  const filteredItems = React.useMemo(() => {
-    if (!searchQuery.trim()) return items;
+  // Filter and sort items
+  const filteredAndSortedItems = React.useMemo(() => {
+    let result = items;
     
-    const query = searchQuery.toLowerCase().trim();
-    return items.filter(item => {
-      // Search in product type
-      if (item.result.productType.toLowerCase().includes(query)) return true;
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(item => {
+        // Search in product type
+        if (item.result.productType.toLowerCase().includes(query)) return true;
+        
+        // Search in materials
+        if (item.result.materials.some(m => 
+          m.name.toLowerCase().includes(query) || 
+          m.finish.toLowerCase().includes(query)
+        )) return true;
+        
+        // Search in color names and codes
+        if (item.result.colors.some(c => 
+          c.name.toLowerCase().includes(query) || 
+          c.code.toLowerCase().includes(query)
+        )) return true;
+        
+        // Search in author
+        if (item.author && item.author.toLowerCase().includes(query)) return true;
+        
+        return false;
+      });
+    }
+    
+    // Apply sorting (only if enableSort is true)
+    if (enableSort) {
+      const now = Date.now();
+      const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
       
-      // Search in materials
-      if (item.result.materials.some(m => 
-        m.name.toLowerCase().includes(query) || 
-        m.finish.toLowerCase().includes(query)
-      )) return true;
-      
-      // Search in color names and codes
-      if (item.result.colors.some(c => 
-        c.name.toLowerCase().includes(query) || 
-        c.code.toLowerCase().includes(query)
-      )) return true;
-      
-      // Search in author
-      if (item.author && item.author.toLowerCase().includes(query)) return true;
-      
-      return false;
-    });
-  }, [items, searchQuery]);
+      result = [...result].sort((a, b) => {
+        switch (sortBy) {
+          case 'trending':
+            // Most liked this week - prioritize recent items with high likes
+            const aIsRecent = a.timestamp >= oneWeekAgo;
+            const bIsRecent = b.timestamp >= oneWeekAgo;
+            if (aIsRecent && !bIsRecent) return -1;
+            if (!aIsRecent && bIsRecent) return 1;
+            // Within same recency, sort by likes
+            return (b.likeCount ?? 0) - (a.likeCount ?? 0);
+          case 'newest':
+            return b.timestamp - a.timestamp;
+          case 'most_liked':
+            return (b.likeCount ?? 0) - (a.likeCount ?? 0);
+          default:
+            return 0;
+        }
+      });
+    }
+    
+    return result;
+  }, [items, searchQuery, sortBy, enableSort]);
+
+  const sortOptions: { value: SortOption; label: string; icon: React.ReactNode }[] = [
+    { value: 'trending', label: 'Trending This Week', icon: <Flame size={16} /> },
+    { value: 'newest', label: 'Newest First', icon: <Clock size={16} /> },
+    { value: 'most_liked', label: 'Most Liked', icon: <TrendingUp size={16} /> },
+  ];
 
   return (
     <div className="min-h-full p-4 pb-24 safe-area-top">
-       <div className="flex items-center justify-between mb-6 px-1">
+       <div className="flex items-center justify-between mb-4 px-1">
          {showSearch ? (
            <div className="flex-1 flex items-center gap-2">
              <div className="flex-1 relative">
@@ -1305,19 +1367,63 @@ const GridView = ({
          ) : (
            <>
              <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-             {enableSearch && (
-               <button 
-                 onClick={() => setShowSearch(true)}
-                 className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors"
-               >
-                 <Search size={20} className="text-gray-400" />
-               </button>
-             )}
+             <div className="flex items-center gap-2">
+               {enableViewToggle && (
+                 <button 
+                   onClick={() => setPaletteView(!paletteView)}
+                   className={`p-2 rounded-full shadow-sm transition-colors ${paletteView ? 'bg-gray-900 text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
+                   title={paletteView ? 'Show cards with images' : 'Show palette only'}
+                 >
+                   {paletteView ? <LayoutGrid size={20} /> : <Grid3X3 size={20} />}
+                 </button>
+               )}
+               {enableSearch && (
+                 <button 
+                   onClick={() => setShowSearch(true)}
+                   className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors"
+                 >
+                   <Search size={20} className="text-gray-400" />
+                 </button>
+               )}
+             </div>
            </>
          )}
        </div>
 
-       {filteredItems.length === 0 ? (
+       {/* Sort Options */}
+       {enableSort && !showSearch && (
+         <div className="mb-4 px-1 relative">
+           <button
+             onClick={() => setShowSortMenu(!showSortMenu)}
+             className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+           >
+             {sortOptions.find(o => o.value === sortBy)?.icon}
+             <span>{sortOptions.find(o => o.value === sortBy)?.label}</span>
+             <ChevronDown size={14} className={`transition-transform ${showSortMenu ? 'rotate-180' : ''}`} />
+           </button>
+           
+           {showSortMenu && (
+             <div className="absolute top-full left-1 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20 min-w-[180px]">
+               {sortOptions.map((option) => (
+                 <button
+                   key={option.value}
+                   onClick={() => { setSortBy(option.value); setShowSortMenu(false); }}
+                   className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                     sortBy === option.value 
+                       ? 'bg-gray-100 text-gray-900' 
+                       : 'text-gray-600 hover:bg-gray-50'
+                   }`}
+                 >
+                   {option.icon}
+                   <span>{option.label}</span>
+                 </button>
+               ))}
+             </div>
+           )}
+         </div>
+       )}
+
+       {filteredAndSortedItems.length === 0 ? (
          <div className="flex flex-col items-center justify-center h-[50vh] text-gray-400">
            {searchQuery ? (
              <>
@@ -1331,9 +1437,60 @@ const GridView = ({
              </>
            )}
          </div>
+       ) : paletteView ? (
+         /* Palette-only view - focuses on colors without product image */
+         <div className="grid grid-cols-3 gap-3">
+           {filteredAndSortedItems.map((item) => (
+             <div 
+               key={item.id} 
+               onClick={() => onSelect(item)} 
+               className="bg-white rounded-2xl shadow-sm border border-white overflow-hidden cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
+             >
+               {/* Color strips */}
+               <div className="flex h-20">
+                 {item.result.colors.slice(0, 4).map((c, i) => (
+                   <div 
+                     key={i} 
+                     className="flex-1" 
+                     style={{ backgroundColor: c.hex }}
+                   />
+                 ))}
+               </div>
+               {/* Info */}
+               <div className="p-2">
+                 <p className="text-[10px] font-bold text-gray-900 truncate">{item.result.productType}</p>
+                 <div className="flex items-center justify-between mt-1">
+                   <p className="text-[9px] text-gray-400">{item.result.colors.length} colors</p>
+                   {showLikes && onLike && (
+                     <button
+                       onClick={(e) => { 
+                         e.stopPropagation(); 
+                         onLike(item.id, item.isLiked ?? false); 
+                       }}
+                       className={`flex items-center gap-0.5 text-[10px] transition-colors ${
+                         item.isLiked 
+                           ? 'text-red-500' 
+                           : 'text-gray-400 hover:text-red-400'
+                       }`}
+                     >
+                       <Heart 
+                         size={10} 
+                         fill={item.isLiked ? 'currentColor' : 'none'}
+                       />
+                       {(item.likeCount ?? 0) > 0 && (
+                         <span>{item.likeCount}</span>
+                       )}
+                     </button>
+                   )}
+                 </div>
+               </div>
+             </div>
+           ))}
+         </div>
        ) : (
+         /* Standard card view with product image */
          <div className="grid grid-cols-2 gap-3">
-           {filteredItems.map((item) => (
+           {filteredAndSortedItems.map((item) => (
              <div 
                 key={item.id} 
                 onClick={() => onSelect(item)} 
@@ -1786,11 +1943,12 @@ const App = () => {
       {/* --- Main Content Area --- */}
       <main className="h-full">
         {activeTab === 'scan' && (
-          <div className="p-4 pt-safe-top flex flex-col h-screen pb-24">
-            <div className="flex items-center gap-2 mb-8 mt-2">
-              <span className="w-2 h-6 bg-black rounded-full block"></span>
-              <h1 className="text-xl font-bold tracking-tight">NCS Lens</h1>
-            </div>
+          <div className="min-h-full pb-24 safe-area-top">
+            <div className="p-4 flex flex-col min-h-[calc(100vh-6rem)]">
+              <div className="flex items-center gap-2 mb-8 mt-2">
+                <span className="w-2 h-6 bg-black rounded-full block"></span>
+                <h1 className="text-xl font-bold tracking-tight">NCS Lens</h1>
+              </div>
             
             <div className="flex-1 flex flex-col justify-center items-center pb-12">
               {/* Loading State - within the scan frame */}
@@ -1846,6 +2004,7 @@ const App = () => {
                 Take a photo to identify NCS/RAL codes and material finishes instantly.
               </p>
             </div>
+          </div>
           </div>
         )}
 
@@ -1978,6 +2137,8 @@ const App = () => {
             onLike={handleLike}
             enableSearch={true}
             showLikes={true}
+            enableSort={true}
+            enableViewToggle={true}
           />
         )}
 
