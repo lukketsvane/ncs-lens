@@ -245,9 +245,9 @@ const calculateColorDistance = (hex1: string, hex2: string): number => {
 };
 
 const getContrastColor = (hex: string) => {
-  const r = parseInt(hex.substr(1, 2), 16);
-  const g = parseInt(hex.substr(3, 2), 16);
-  const b = parseInt(hex.substr(5, 2), 16);
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
   const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
   return yiq >= 128 ? 'text-black' : 'text-white';
 };
@@ -296,6 +296,11 @@ const ncsHueToDegrees = (hueStr: string): number => {
 
 // Convert hex color to approximate NCS values
 const hexToNcsApprox = (hex: string): NCSColor => {
+  // Validate hex format
+  if (!hex || !/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+    return { hue: 0, blackness: 30, chromaticness: 40 }; // Default fallback
+  }
+  
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;
@@ -1058,13 +1063,11 @@ const ResultView = ({
                 hue={wheelColor.hue} 
                 onChange={(newHue) => {
                   setWheelColor(prev => ({ ...prev, hue: newHue }));
-                  // Update the edited color with new NCS code and hex
+                  // Update the edited color with new NCS code
                   const newNcsHue = degreesToNcsHue(newHue);
                   const sStr = Math.round(wheelColor.blackness).toString().padStart(2, '0');
                   const cStr = Math.round(wheelColor.chromaticness).toString().padStart(2, '0');
                   const newCode = `S ${sStr}${cStr}-${newNcsHue}`;
-                  const newHex = ncsToCss({ hue: newHue, blackness: wheelColor.blackness, chromaticness: wheelColor.chromaticness });
-                  // Convert HSL string to hex approximation
                   setEditedColor(prev => prev ? { 
                     ...prev, 
                     code: newCode,
