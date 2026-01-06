@@ -464,7 +464,7 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
   const [compareColor, setCompareColor] = useState<ColorMatch | null>(null);
   const [showSimilarColors, setShowSimilarColors] = useState(false);
   
-  // Wheel state for exploration (read-only, no editing capability since this is view-only)
+  // Wheel state for interactive color exploration (allows adjusting the wheel to explore variations)
   const [wheelColor, setWheelColor] = useState<NCSColor>(() => {
     // Initialize from the current color
     const parsed = parseNCSStr(color.code);
@@ -824,18 +824,24 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
         )}
       </div>
 
-      {/* Bottom Actions - Hide in compare mode and wheel mode to maximize space */}
-      {!(activeTab === 'compare' && compareColor) && activeTab !== 'wheel' && !showSimilarColors && (
-        <div className="p-4 border-t border-gray-100 bg-white safe-area-bottom">
-          <button 
-            onClick={() => setShowSimilarColors(true)}
-            className="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2"
-          >
-            <Palette size={18} />
-            <span>Find Similar Colors ({similarColors.length})</span>
-          </button>
-        </div>
-      )}
+      {/* Bottom Actions - Hide in compare mode (with selected color), wheel mode, and similar colors overlay */}
+      {(() => {
+        const isCompareWithSelection = activeTab === 'compare' && compareColor;
+        const isWheelTab = activeTab === 'wheel';
+        const showBottomActions = !isCompareWithSelection && !isWheelTab && !showSimilarColors;
+        
+        return showBottomActions && (
+          <div className="p-4 border-t border-gray-100 bg-white safe-area-bottom">
+            <button 
+              onClick={() => setShowSimilarColors(true)}
+              className="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2"
+            >
+              <Palette size={18} />
+              <span>Find Similar Colors ({similarColors.length})</span>
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Similar Colors Overlay */}
       {showSimilarColors && (
