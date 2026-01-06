@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>NCS Scanner - AI Material & Color Identification | ncs.iverfinne.no</title>
     
     <!-- SEO Meta Tags -->
@@ -50,11 +50,25 @@
         background-color: #f2f2f7; /* iOS grouped background color */
         -webkit-tap-highlight-color: transparent;
       }
+      /* Safe area classes for iPhone notch/dynamic island */
       .safe-area-top {
         padding-top: env(safe-area-inset-top);
       }
       .safe-area-bottom {
         padding-bottom: env(safe-area-inset-bottom);
+      }
+      .pt-safe-top {
+        padding-top: env(safe-area-inset-top);
+      }
+      .pb-safe-bottom {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      .mt-safe-top {
+        margin-top: env(safe-area-inset-top);
+      }
+      /* Minimum safe area padding for iPhone 16 dynamic island (59px approx) */
+      .safe-area-top-min {
+        padding-top: max(env(safe-area-inset-top), 20px);
       }
       /* Hide scrollbar for clean horizontal scrolling */
       .no-scrollbar::-webkit-scrollbar {

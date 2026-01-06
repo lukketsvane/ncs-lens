@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { 
@@ -47,6 +47,7 @@ import {
   deltaE2000,
   hexToRgb as ncsHexToRgb
 } from "./lib/ncs-colors";
+import { useSwipeGesture } from "./lib/useSwipeGesture";
 
 // --- Constants ---
 const EDGE_CONFIG_STORE_ID = "ecfg_xlrdrn2ms13tkf3hezgonww7tpbk"; // Prepared for backend integration
