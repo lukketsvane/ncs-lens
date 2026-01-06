@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { 
@@ -47,10 +47,45 @@ import {
   deltaE2000,
   hexToRgb as ncsHexToRgb
 } from "./lib/ncs-colors";
+import { useSwipeGesture } from "./lib/useSwipeGesture";
+import { getSavedColors, saveColor, unsaveColor, isColorSaved, SavedColor } from "./lib/saved-colors";
+
+// --- URL Routing Helpers ---
+
+// Convert color code to URL-safe format
+const colorCodeToUrl = (system: string, code: string): string => {
+  // NCS S 1050-Y90R -> ncs/s-1050-y90r
+  // RAL 9010 -> ral/9010
+  const sanitizedCode = code.toLowerCase().replace(/\s+/g, '-');
+  return `/color/${system.toLowerCase()}/${sanitizedCode}`;
+};
+
+// Parse URL to get color info
+const parseColorUrl = (path: string): { system: string; code: string } | null => {
+  const match = path.match(/^\/color\/(ncs|ral)\/(.+)$/i);
+  if (!match) return null;
+  
+  const system = match[1].toUpperCase();
+  // Convert URL-safe format back to standard NCS notation:
+  // URL format: s-1050-y90r (lowercase, hyphens for spaces)
+  // NCS format: S 1050-Y90R (uppercase, space after S, hyphen before hue)
+  // Steps: 1) Uppercase all, 2) Replace hyphens with spaces, 3) Fix "S " prefix spacing
+  let code = match[2].toUpperCase();
+  if (system === 'NCS') {
+    code = code.replace(/-/g, ' ').replace(/^S\s+/, 'S ');
+  }
+  return { system, code };
+};
+
+// Update browser URL without page reload
+const updateUrl = (path: string) => {
+  window.history.pushState({}, '', path);
+};
 
 // --- Constants ---
 const EDGE_CONFIG_STORE_ID = "ecfg_xlrdrn2ms13tkf3hezgonww7tpbk"; // Prepared for backend integration
 const MAX_SIMILAR_COLOR_DISTANCE = 30; // Delta E threshold for "similar" colors
+const DEFAULT_COLOR_HEX = '#888888'; // Default hex for colors loaded from URL before enrichment
 
 // --- Types ---
 
@@ -478,12 +513,54 @@ interface SimilarColorResult {
   source: 'history' | 'community';
 }
 
-const ColorDetailView = ({ color, history, communityItems, onBack }: { color: ColorMatch, history: HistoryItem[], communityItems: HistoryItem[], onBack: () => void }) => {
+const ColorDetailView = ({ 
+  color, 
+  history, 
+  communityItems, 
+  onBack,
+  onSaveColor,
+  onUnsaveColor,
+  isSaved,
+  onSelectColor
+}: { 
+  color: ColorMatch, 
+  history: HistoryItem[], 
+  communityItems: HistoryItem[], 
+  onBack: () => void,
+  onSaveColor?: (color: ColorMatch) => void,
+  onUnsaveColor?: (color: ColorMatch) => void,
+  isSaved?: boolean,
+  onSelectColor?: (color: ColorMatch) => void
+}) => {
   const isNCS = color.system === 'NCS';
   
   const [activeTab, setActiveTab] = useState<'details' | 'combinations' | 'compare' | 'wheel'>('details');
   const [compareColor, setCompareColor] = useState<ColorMatch | null>(null);
   const [showSimilarColors, setShowSimilarColors] = useState(false);
+  const [colorSaved, setColorSaved] = useState(isSaved ?? false);
+  
+  // Swipe gesture for back navigation
+  const swipeHandlers = useSwipeGesture({
+    onSwipeRight: onBack,
+    threshold: 50,
+    edgeThreshold: 40,
+  });
+  
+  // Update URL when viewing color
+  useEffect(() => {
+    const colorUrl = colorCodeToUrl(color.system, color.code);
+    updateUrl(colorUrl);
+    
+    // Restore URL on unmount
+    return () => {
+      updateUrl('/');
+    };
+  }, [color.system, color.code]);
+  
+  // Sync saved state with prop
+  useEffect(() => {
+    setColorSaved(isSaved ?? false);
+  }, [isSaved]);
   
   // Wheel state for interactive color exploration (allows adjusting the wheel to explore variations)
   const [wheelColor, setWheelColor] = useState<NCSColor>(() => {
@@ -565,7 +642,10 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
   }, [history, color]);
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
+    <div 
+      className="fixed inset-0 z-[60] bg-white flex flex-col animate-in slide-in-from-bottom duration-300"
+      {...swipeHandlers}
+    >
       
       {/* 1. Top Section - Visual Navigator (Matches Screenshot) */}
       <div 
@@ -588,9 +668,32 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
           <div className={`text-sm font-bold ${contrastText} opacity-90`}>
             {color.name}
           </div>
-          <button className={`${contrastText} opacity-80 hover:opacity-100`}>
-            <Share2 size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Save/Bookmark Button */}
+            {onSaveColor && onUnsaveColor && (
+              <button 
+                onClick={() => {
+                  if (colorSaved) {
+                    onUnsaveColor(color);
+                    setColorSaved(false);
+                  } else {
+                    onSaveColor(color);
+                    setColorSaved(true);
+                  }
+                }}
+                className={`${contrastText} opacity-80 hover:opacity-100 transition-all`}
+              >
+                <Heart 
+                  size={20} 
+                  fill={colorSaved ? 'currentColor' : 'none'}
+                  className={colorSaved ? 'text-red-500' : ''}
+                />
+              </button>
+            )}
+            <button className={`${contrastText} opacity-80 hover:opacity-100`}>
+              <Share2 size={20} />
+            </button>
+          </div>
         </div>
 
         {/* NCS Data Display */}
@@ -886,7 +989,8 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
               similarColors.map((item, i) => (
                 <div 
                   key={i}
-                  className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors"
+                  onClick={() => onSelectColor?.(item.color)}
+                  className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors cursor-pointer active:scale-[0.98]"
                 >
                   <div 
                     className="w-14 h-14 rounded-xl shadow-sm border border-gray-200 flex-shrink-0" 
@@ -951,6 +1055,13 @@ const ResultView = ({
   const [editingProductType, setEditingProductType] = useState(false);
   const [editedProductType, setEditedProductType] = useState(result.productType);
 
+  // Swipe gesture for back navigation
+  const swipeHandlers = useSwipeGesture({
+    onSwipeRight: onBack,
+    threshold: 50,
+    edgeThreshold: 40,
+  });
+
   const handlePublish = async () => {
     if (isPublic || !onPublish) return;
     setIsPublishing(true);
@@ -975,7 +1086,10 @@ const ResultView = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-[#F0F2F5] z-40 overflow-y-auto no-scrollbar safe-area-top safe-area-bottom">
+    <div 
+      className="fixed inset-0 bg-[#F0F2F5] z-40 overflow-y-auto no-scrollbar safe-area-top safe-area-bottom"
+      {...swipeHandlers}
+    >
       <div className="p-4 min-h-full pb-20">
         <div className="flex justify-between items-center mb-6">
           <button onClick={onBack} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-100">
@@ -1287,10 +1401,13 @@ const App = () => {
   
   // Navigation State
   const [activeTab, setActiveTab] = useState<Tab>('scan');
+  const [historySubTab, setHistorySubTab] = useState<'scans' | 'colors'>('scans');
   
   // Data State - use Supabase for persistence
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [communityItems, setCommunityItems] = useState<HistoryItem[]>([]);
+  const [savedColors, setSavedColors] = useState<SavedColor[]>([]);
+  const [savedColorKeys, setSavedColorKeys] = useState<Set<string>>(new Set());
   const [dataLoading, setDataLoading] = useState(true);
 
   // UI State
@@ -1299,6 +1416,37 @@ const App = () => {
   const [detailColor, setDetailColor] = useState<ColorMatch | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle URL routing for colors on mount
+  useEffect(() => {
+    const handlePopState = () => {
+      const colorInfo = parseColorUrl(window.location.pathname);
+      if (colorInfo) {
+        // Create a basic ColorMatch from URL - will be enriched when NCS database is available
+        const basicColor: ColorMatch = {
+          system: colorInfo.system as 'NCS' | 'RAL',
+          code: colorInfo.code,
+          name: colorInfo.code,
+          hex: DEFAULT_COLOR_HEX,
+          location: '-',
+          confidence: 'High',
+          materialGuess: '-',
+          finishGuess: '-',
+          laymanDescription: '-',
+        };
+        setDetailColor(basicColor);
+      } else {
+        setDetailColor(null);
+      }
+    };
+
+    // Check URL on mount
+    handlePopState();
+
+    // Listen for browser back/forward
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Load data from Supabase on mount
   useEffect(() => {
@@ -1316,8 +1464,15 @@ const App = () => {
             isPublic: scan.is_public,
           }));
           setHistory(historyItems);
+
+          // Fetch saved colors
+          const colors = await getSavedColors(user.id);
+          setSavedColors(colors);
+          setSavedColorKeys(new Set(colors.map(c => `${c.color_system}:${c.color_code}`)));
         } else {
           setHistory([]);
+          setSavedColors([]);
+          setSavedColorKeys(new Set());
         }
 
         // Fetch public scans for community (available to everyone)
@@ -1561,6 +1716,67 @@ const App = () => {
     }
   };
 
+  // Save color handler
+  const handleSaveColor = async (color: ColorMatch) => {
+    if (!user) {
+      setActiveTab('profile');
+      return;
+    }
+
+    const colorKey = `${color.system}:${color.code}`;
+    
+    // Optimistic update
+    setSavedColorKeys(prev => new Set([...prev, colorKey]));
+
+    const saved = await saveColor(user.id, {
+      system: color.system,
+      code: color.code,
+      name: color.name,
+      hex: color.hex,
+    });
+
+    if (saved) {
+      setSavedColors(prev => [saved, ...prev]);
+    } else {
+      // Revert on failure (might be duplicate)
+      setSavedColorKeys(prev => {
+        const next = new Set(prev);
+        next.delete(colorKey);
+        return next;
+      });
+    }
+  };
+
+  // Unsave color handler
+  const handleUnsaveColor = async (color: ColorMatch) => {
+    if (!user) return;
+
+    const colorKey = `${color.system}:${color.code}`;
+    
+    // Optimistic update
+    setSavedColorKeys(prev => {
+      const next = new Set(prev);
+      next.delete(colorKey);
+      return next;
+    });
+    setSavedColors(prev => prev.filter(c => !(c.color_system === color.system && c.color_code === color.code)));
+
+    const success = await unsaveColor(user.id, color.system, color.code);
+
+    if (!success) {
+      // Revert on failure
+      setSavedColorKeys(prev => new Set([...prev, colorKey]));
+      // Reload saved colors
+      const colors = await getSavedColors(user.id);
+      setSavedColors(colors);
+    }
+  };
+
+  // Check if a color is saved
+  const isColorSaved = (color: ColorMatch): boolean => {
+    return savedColorKeys.has(`${color.system}:${color.code}`);
+  };
+
   // Render
   if (dataLoading) {
     return (
@@ -1640,12 +1856,124 @@ const App = () => {
         )}
 
         {activeTab === 'history' && (
-          <GridView 
-            items={history} 
-            title="My Collection" 
-            onSelect={setDetailItem} 
-            onDelete={user ? handleDelete : undefined}
-          />
+          <div className="min-h-full pb-24 safe-area-top">
+            {/* Sub-tabs */}
+            <div className="p-4 pb-0">
+              <h1 className="text-2xl font-bold tracking-tight mb-4 px-1">My Collection</h1>
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setHistorySubTab('scans')}
+                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                    historySubTab === 'scans' 
+                      ? 'bg-gray-900 text-white' 
+                      : 'bg-white text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <Layers size={14} className="inline mr-2" />
+                  Scans
+                </button>
+                <button
+                  onClick={() => setHistorySubTab('colors')}
+                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                    historySubTab === 'colors' 
+                      ? 'bg-gray-900 text-white' 
+                      : 'bg-white text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <Heart size={14} className="inline mr-2" />
+                  Saved Colors ({savedColors.length})
+                </button>
+              </div>
+            </div>
+
+            {historySubTab === 'scans' ? (
+              /* Scans Grid */
+              <div className="px-4">
+                {history.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-[50vh] text-gray-400">
+                    <Layers size={48} className="mb-4 opacity-20" />
+                    <p>No scans yet</p>
+                    <p className="text-sm mt-1">Take a photo to get started!</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {history.map((item) => (
+                      <div 
+                        key={item.id} 
+                        onClick={() => setDetailItem(item)} 
+                        className="bg-white p-3 rounded-2xl shadow-sm border border-white flex flex-col gap-3 cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
+                      >
+                        <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-100">
+                          <img src={item.image} className="w-full h-full object-cover" loading="lazy" />
+                          {user && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                              className="absolute top-2 right-2 p-1.5 bg-black/20 backdrop-blur-md rounded-full text-white/80 hover:bg-red-500 hover:text-white transition-colors"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-gray-900 text-sm truncate leading-tight">{item.result.productType}</h3>
+                          <div className="flex items-center gap-1 mt-2">
+                            {item.result.colors.slice(0, 3).map((c, i) => (
+                              <div key={i} className="w-3 h-3 rounded-full border border-black/5" style={{backgroundColor: c.hex}} />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Saved Colors Grid */
+              <div className="px-4">
+                {savedColors.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-[50vh] text-gray-400">
+                    <Heart size={48} className="mb-4 opacity-20" />
+                    <p>No saved colors yet</p>
+                    <p className="text-sm mt-1">Tap the heart icon on any color to save it!</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {savedColors.map((color) => {
+                      // Convert SavedColor to ColorMatch for display
+                      const colorMatch: ColorMatch = {
+                        system: color.color_system,
+                        code: color.color_code,
+                        name: color.color_name || color.color_code,
+                        hex: color.color_hex,
+                        location: '-',
+                        confidence: 'High',
+                        materialGuess: '-',
+                        finishGuess: '-',
+                        laymanDescription: '-',
+                      };
+                      
+                      return (
+                        <div 
+                          key={color.id}
+                          onClick={() => setDetailColor(colorMatch)}
+                          className="bg-white p-3 rounded-2xl shadow-sm border border-white flex flex-col gap-2 cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
+                        >
+                          <div 
+                            className="aspect-square rounded-xl shadow-sm border border-gray-100" 
+                            style={{ backgroundColor: color.color_hex }}
+                          />
+                          <div className="min-w-0 text-center">
+                            <p className="font-bold text-gray-900 text-xs truncate">{color.color_code.split(' ').pop()}</p>
+                            <p className="text-[10px] text-gray-400 truncate">{color.color_system}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {activeTab === 'community' && (
@@ -1683,7 +2011,14 @@ const App = () => {
           color={detailColor} 
           history={history}
           communityItems={communityItems}
-          onBack={() => setDetailColor(null)} 
+          onBack={() => {
+            setDetailColor(null);
+            updateUrl('/');
+          }}
+          onSaveColor={user ? handleSaveColor : undefined}
+          onUnsaveColor={user ? handleUnsaveColor : undefined}
+          isSaved={isColorSaved(detailColor)}
+          onSelectColor={(color) => setDetailColor(color)}
         />
       )}
 
