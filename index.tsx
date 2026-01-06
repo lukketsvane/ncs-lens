@@ -460,9 +460,22 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
   const chroma = color.chromaticness || parseNCSStr(color.code)?.chroma || "--";
   const hue = color.hue || parseNCSStr(color.code)?.hue || "";
   
-  const [activeTab, setActiveTab] = useState<'details' | 'combinations' | 'compare'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'combinations' | 'compare' | 'wheel'>('details');
   const [compareColor, setCompareColor] = useState<ColorMatch | null>(null);
   const [showSimilarColors, setShowSimilarColors] = useState(false);
+  
+  // Wheel state for exploration (read-only, no editing capability since this is view-only)
+  const [wheelColor, setWheelColor] = useState<NCSColor>(() => {
+    // Initialize from the current color
+    const parsed = parseNCSStr(color.code);
+    if (parsed && isNCS) {
+      const hueValue = ncsHueToDegrees(parsed.hue);
+      const blacknessValue = parseInt(parsed.blackness, 10) || 30;
+      const chromaticnessValue = parseInt(parsed.chroma, 10) || 40;
+      return { hue: hueValue, blackness: blacknessValue, chromaticness: chromaticnessValue };
+    }
+    return hexToNcsApprox(color.hex);
+  });
   
   // Calculate similar colors from history and community
   const similarColors = React.useMemo(() => {
@@ -600,6 +613,12 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
           >
             Compare
           </button>
+          <button 
+            onClick={() => setActiveTab('wheel')}
+            className={`flex-1 py-4 text-sm font-semibold text-center border-b-2 transition-colors ${activeTab === 'wheel' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}
+          >
+            Wheel
+          </button>
         </div>
       </div>
 
@@ -725,10 +744,88 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
              )}
           </div>
         )}
+
+        {activeTab === 'wheel' && (
+          <div className="h-full flex flex-col animate-in fade-in bg-[#f2f2f2]">
+            {/* Wheel Header with current color info */}
+            <div 
+              className="w-full py-6 px-6 transition-colors duration-300"
+              style={{ backgroundColor: ncsToCss(wheelColor) }}
+            >
+              {(() => {
+                const ncsHue = degreesToNcsHue(wheelColor.hue);
+                const sStr = Math.round(wheelColor.blackness).toString().padStart(2, '0');
+                const cStr = Math.round(wheelColor.chromaticness).toString().padStart(2, '0');
+                const isNeutralColor = wheelColor.chromaticness < 2;
+                const isDark = wheelColor.blackness > 40;
+                const textColor = isDark ? "text-white" : "text-gray-900";
+                const labelColor = isDark ? "text-white/60" : "text-gray-600";
+                const dividerOpacity = isDark ? "opacity-40" : "opacity-20";
+                
+                return (
+                  <div className={`max-w-md mx-auto flex items-center justify-center font-sans ${textColor}`}>
+                    <div className="flex flex-col items-center">
+                      <div className={`flex gap-6 text-[10px] font-bold tracking-widest uppercase mb-1 ${labelColor}`}>
+                        <span>Blackness</span><span>Chroma</span>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-light">S</span>
+                        <div className="flex gap-2 ml-1">
+                          <span className="text-4xl font-normal tracking-tight">{sStr}</span>
+                          <span className="text-4xl font-normal tracking-tight">{cStr}</span>
+                        </div>
+                        <span className={`text-3xl font-light ${dividerOpacity} mx-2`}>-</span>
+                        <span className="text-3xl font-normal tracking-tight">{isNeutralColor ? 'N' : ncsHue}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* NCS Wheel */}
+            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-md mx-auto relative p-4">
+              <div className="relative flex items-center justify-center" style={{ width: 280, height: 280 }}>
+                <HueRing 
+                  hue={wheelColor.hue} 
+                  onChange={(newHue) => setWheelColor(prev => ({ ...prev, hue: newHue }))} 
+                  size={280} 
+                />
+                <TrianglePicker 
+                  color={wheelColor} 
+                  onChange={(s, c) => setWheelColor(prev => ({ ...prev, blackness: s, chromaticness: c }))} 
+                  size={220} 
+                />
+              </div>
+            </div>
+
+            {/* Reset button */}
+            <div className="p-4 bg-white border-t border-gray-100">
+              <button
+                onClick={() => {
+                  // Reset to original color
+                  const parsed = parseNCSStr(color.code);
+                  if (parsed && isNCS) {
+                    const hueValue = ncsHueToDegrees(parsed.hue);
+                    const blacknessValue = parseInt(parsed.blackness, 10) || 30;
+                    const chromaticnessValue = parseInt(parsed.chroma, 10) || 40;
+                    setWheelColor({ hue: hueValue, blackness: blacknessValue, chromaticness: chromaticnessValue });
+                  } else {
+                    setWheelColor(hexToNcsApprox(color.hex));
+                  }
+                }}
+                className="w-full py-3 px-4 bg-gray-100 text-gray-700 font-semibold rounded-2xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <RotateCcw size={16} />
+                Reset to Original
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Bottom Actions - Hide in compare mode to maximize space */}
-      {!(activeTab === 'compare' && compareColor) && !showSimilarColors && (
+      {/* Bottom Actions - Hide in compare mode and wheel mode to maximize space */}
+      {!(activeTab === 'compare' && compareColor) && activeTab !== 'wheel' && !showSimilarColors && (
         <div className="p-4 border-t border-gray-100 bg-white safe-area-bottom">
           <button 
             onClick={() => setShowSimilarColors(true)}
@@ -845,11 +942,6 @@ const ResultView = ({
   // Edit state
   const [editingProductType, setEditingProductType] = useState(false);
   const [editedProductType, setEditedProductType] = useState(result.productType);
-  
-  // Color edit state
-  const [editingColorIndex, setEditingColorIndex] = useState<number | null>(null);
-  const [editedColor, setEditedColor] = useState<ColorMatch | null>(null);
-  const [wheelColor, setWheelColor] = useState<NCSColor>({ hue: 0, blackness: 30, chromaticness: 40 });
 
   const handlePublish = async () => {
     if (isPublic || !onPublish) return;
@@ -872,40 +964,6 @@ const ResultView = ({
       onUpdate({ productType: editedProductType });
     }
     setEditingProductType(false);
-  };
-
-  const handleStartEditColor = (index: number) => {
-    const colorToEdit = result.colors[index];
-    setEditingColorIndex(index);
-    setEditedColor({ ...colorToEdit });
-    
-    // Initialize wheel color from the color being edited
-    // First try to parse from NCS code, then fallback to hex approximation
-    const parsed = parseNCSStr(colorToEdit.code);
-    if (parsed && colorToEdit.system === 'NCS') {
-      const hue = ncsHueToDegrees(parsed.hue);
-      const blackness = parseInt(parsed.blackness, 10) || 30;
-      const chromaticness = parseInt(parsed.chroma, 10) || 40;
-      setWheelColor({ hue, blackness, chromaticness });
-    } else {
-      // Fallback: approximate from hex color
-      setWheelColor(hexToNcsApprox(colorToEdit.hex));
-    }
-  };
-
-  const handleSaveColor = () => {
-    if (onUpdate && editedColor && editingColorIndex !== null) {
-      const newColors = [...result.colors];
-      newColors[editingColorIndex] = editedColor;
-      onUpdate({ colors: newColors });
-    }
-    setEditingColorIndex(null);
-    setEditedColor(null);
-  };
-
-  const handleCancelEditColor = () => {
-    setEditingColorIndex(null);
-    setEditedColor(null);
   };
 
   return (
@@ -1023,14 +1081,6 @@ const ResultView = ({
                      <span className="text-[10px] font-bold tracking-widest uppercase bg-black/10 backdrop-blur-sm px-2 py-1 rounded-lg border border-white/10">{color.system}</span>
                      
                      <div className="flex items-center gap-2">
-                        {isOwner && (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleStartEditColor(i); }}
-                            className="p-1.5 rounded-full hover:bg-black/10 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <Pencil size={14} className={textColorClass === 'text-black' ? 'text-black/60' : 'text-white/80'} />
-                          </button>
-                        )}
                         {onRegenerate && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
@@ -1060,151 +1110,6 @@ const ResultView = ({
           </div>
         </div>
       </div>
-
-      {/* Color Edit Modal with NCS Wheel */}
-      {editingColorIndex !== null && editedColor && (
-        <div className="fixed inset-0 bg-[#f2f2f2] z-[100] flex flex-col animate-in slide-in-from-bottom duration-300">
-          {/* Color Header Strip - matching app styling */}
-          <div 
-            className="w-full pt-10 pb-6 px-6 transition-colors duration-300 relative z-20 shadow-sm"
-            style={{ backgroundColor: ncsToCss(wheelColor) }}
-          >
-            {(() => {
-              const ncsHue = degreesToNcsHue(wheelColor.hue);
-              const sStr = Math.round(wheelColor.blackness).toString().padStart(2, '0');
-              const cStr = Math.round(wheelColor.chromaticness).toString().padStart(2, '0');
-              const isNeutral = wheelColor.chromaticness < 2;
-              const isDark = wheelColor.blackness > 40;
-              const textColor = isDark ? "text-white" : "text-gray-900";
-              const labelColor = isDark ? "text-white/60" : "text-gray-600";
-              const dividerOpacity = isDark ? "opacity-40" : "opacity-20";
-              
-              return (
-                <div className={`max-w-md mx-auto flex items-center justify-between font-sans ${textColor}`}>
-                  <button 
-                    onClick={handleCancelEditColor}
-                    className={`p-2 -ml-2 rounded-full hover:bg-black/10 transition-colors ${textColor}`}
-                  >
-                    <ChevronLeft size={24} />
-                  </button>
-                  <div className="flex flex-col items-center flex-1">
-                    <div className={`flex gap-6 text-[10px] font-bold tracking-widest uppercase mb-1 ${labelColor}`}>
-                      <span>Blackness</span><span>Chroma</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-light">S</span>
-                      <div className="flex gap-2 ml-1">
-                        <span className="text-4xl font-normal tracking-tight">{sStr}</span>
-                        <span className="text-4xl font-normal tracking-tight">{cStr}</span>
-                      </div>
-                      <span className={`text-3xl font-light ${dividerOpacity} mx-2`}>-</span>
-                      <span className="text-3xl font-normal tracking-tight">{isNeutral ? 'N' : ncsHue}</span>
-                    </div>
-                  </div>
-                  <div className="w-10" /> {/* Spacer for symmetry */}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* NCS Wheel Container */}
-          <div className="flex-grow flex flex-col items-center justify-center w-full max-w-md mx-auto relative p-4">
-            <div className="relative flex items-center justify-center" style={{ width: 280, height: 280 }}>
-              <HueRing 
-                hue={wheelColor.hue} 
-                onChange={(newHue) => {
-                  // Use functional update to access current state values
-                  setWheelColor(prev => {
-                    const newNcsHue = degreesToNcsHue(newHue);
-                    const sStr = Math.round(prev.blackness).toString().padStart(2, '0');
-                    const cStr = Math.round(prev.chromaticness).toString().padStart(2, '0');
-                    const newCode = `S ${sStr}${cStr}-${newNcsHue}`;
-                    
-                    // Update edited color with new NCS code
-                    setEditedColor(prevColor => prevColor ? { 
-                      ...prevColor, 
-                      code: newCode,
-                      hue: newNcsHue,
-                      system: 'NCS' as const
-                    } : null);
-                    
-                    return { ...prev, hue: newHue };
-                  });
-                }} 
-                size={280} 
-              />
-              <TrianglePicker 
-                color={wheelColor} 
-                onChange={(s, c) => {
-                  // Use functional update to access current state values
-                  setWheelColor(prev => {
-                    const ncsHue = degreesToNcsHue(prev.hue);
-                    const sStr = Math.round(s).toString().padStart(2, '0');
-                    const cStr = Math.round(c).toString().padStart(2, '0');
-                    const newCode = `S ${sStr}${cStr}-${ncsHue}`;
-                    
-                    // Update edited color with new NCS code
-                    setEditedColor(prevColor => prevColor ? { 
-                      ...prevColor, 
-                      code: newCode,
-                      blackness: sStr,
-                      chromaticness: cStr,
-                      system: 'NCS' as const
-                    } : null);
-                    
-                    return { ...prev, blackness: s, chromaticness: c };
-                  });
-                }} 
-                size={220} 
-              />
-            </div>
-          </div>
-
-          {/* Bottom Actions */}
-          <div className="p-4 bg-white border-t border-gray-100 safe-area-bottom">
-            <div className="max-w-md mx-auto flex gap-3">
-              <button
-                onClick={handleCancelEditColor}
-                className="flex-1 py-4 px-4 bg-gray-100 text-gray-700 font-semibold rounded-2xl hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  // Update the hex color before saving
-                  if (editedColor) {
-                    const hexColor = ncsToHex(wheelColor);
-                    const ncsHue = degreesToNcsHue(wheelColor.hue);
-                    const sStr = Math.round(wheelColor.blackness).toString().padStart(2, '0');
-                    const cStr = Math.round(wheelColor.chromaticness).toString().padStart(2, '0');
-                    const finalColor = {
-                      ...editedColor,
-                      code: `S ${sStr}${cStr}-${ncsHue}`,
-                      blackness: sStr,
-                      chromaticness: cStr,
-                      hue: ncsHue,
-                      hex: hexColor,
-                      system: 'NCS' as const
-                    };
-                    setEditedColor(finalColor);
-                    // Save with updated color
-                    if (onUpdate && editingColorIndex !== null) {
-                      const newColors = [...result.colors];
-                      newColors[editingColorIndex] = finalColor;
-                      onUpdate({ colors: newColors });
-                    }
-                  }
-                  setEditingColorIndex(null);
-                  setEditedColor(null);
-                }}
-                className="flex-1 py-4 px-4 bg-gray-900 text-white font-semibold rounded-2xl hover:bg-black transition-colors"
-              >
-                Save Color
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -1384,7 +1289,6 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [detailItem, setDetailItem] = useState<HistoryItem | null>(null);
   const [detailColor, setDetailColor] = useState<ColorMatch | null>(null);
-  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1608,7 +1512,7 @@ const App = () => {
 
   const handleLike = async (scanId: string, isCurrentlyLiked: boolean) => {
     if (!user) {
-      setShowAuthPrompt(true);
+      setActiveTab('profile');
       return;
     }
 
@@ -1655,14 +1559,6 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-[#111] font-sans">
-      
-      {/* Loading Overlay - shown during analysis without hiding UI */}
-      {loading && (
-        <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-[100] flex flex-col items-center justify-center">
-           <Loader2 size={48} className="animate-spin text-black mb-4" />
-           <p className="font-medium animate-pulse text-gray-500">Analyzing materials...</p>
-        </div>
-      )}
 
       {/* --- Main Content Area --- */}
       <main className="h-full">
@@ -1670,31 +1566,59 @@ const App = () => {
           <div className="p-4 pt-safe-top flex flex-col h-screen pb-24">
             <div className="flex items-center gap-2 mb-8 mt-2">
               <span className="w-2 h-6 bg-black rounded-full block"></span>
-              <h1 className="text-xl font-bold tracking-tight">CMF Lens</h1>
+              <h1 className="text-xl font-bold tracking-tight">NCS Scanner</h1>
             </div>
             
             <div className="flex-1 flex flex-col justify-center items-center pb-12">
-              <div 
-                onClick={() => {
-                  if (!user) {
-                    setShowAuthPrompt(true);
-                    return;
-                  }
-                  fileInputRef.current?.click();
-                }}
-                className="group relative cursor-pointer bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] shadow-[0_20px_40px_rgba(0,0,0,0.05)] border border-white flex flex-col items-center justify-center gap-8 overflow-hidden transition-all active:scale-[0.98] hover:shadow-[0_25px_50px_rgba(0,0,0,0.08)]"
-              >
-                <div className="absolute inset-0 bg-gradient-to-tr from-gray-50 via-white to-gray-50 opacity-50" />
-                <div className="relative z-10 w-24 h-24 bg-[#F5F5F7] rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
-                   <Sparkles size={36} className="text-gray-400 group-hover:text-black transition-colors duration-500" />
-                </div>
-                <div className="relative z-10 text-center space-y-3">
-                  <h2 className="text-2xl font-bold text-gray-900 tracking-tight">New Scan</h2>
-                  <div className="flex items-center justify-center gap-3 text-gray-400 text-sm font-medium bg-white px-4 py-2 rounded-full shadow-sm">
-                    <Camera size={16} /> <span className="w-px h-3 bg-gray-200"></span> <ImageIcon size={16} />
+              {/* Loading State - within the scan frame */}
+              {loading ? (
+                <div className="group relative bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] shadow-[0_20px_40px_rgba(0,0,0,0.05)] border border-white flex flex-col items-center justify-center gap-6 overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-gray-50 via-white to-gray-50 opacity-50" />
+                  <div className="relative z-10">
+                    <Loader2 size={48} className="animate-spin text-black" />
+                  </div>
+                  <div className="relative z-10 text-center space-y-2">
+                    <h2 className="text-xl font-bold text-gray-900 tracking-tight">Analyzing Materials</h2>
+                    <p className="text-sm text-gray-400 animate-pulse">Identifying colors and finishes...</p>
                   </div>
                 </div>
-              </div>
+              ) : !user ? (
+                /* Not logged in - grayed out scan frame with sign in button */
+                <div className="group relative bg-gray-100 rounded-[40px] w-full max-w-[320px] aspect-[3/4] shadow-[0_10px_30px_rgba(0,0,0,0.03)] border border-gray-200 flex flex-col items-center justify-center gap-6 overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-gray-100 via-gray-50 to-gray-100 opacity-60" />
+                  <div className="relative z-10 w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
+                    <Sparkles size={32} className="text-gray-300" />
+                  </div>
+                  <div className="relative z-10 text-center space-y-3 px-6">
+                    <h2 className="text-xl font-bold text-gray-400 tracking-tight">Sign In to Scan</h2>
+                    <p className="text-sm text-gray-400 leading-relaxed">Create an account or sign in to start scanning materials and colors.</p>
+                    <button
+                      onClick={() => setActiveTab('profile')}
+                      className="mt-4 bg-gray-900 text-white font-semibold py-3 px-6 rounded-2xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2 mx-auto"
+                    >
+                      <User size={18} />
+                      <span>Sign In / Sign Up</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Logged in - normal scan frame */
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="group relative cursor-pointer bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] shadow-[0_20px_40px_rgba(0,0,0,0.05)] border border-white flex flex-col items-center justify-center gap-8 overflow-hidden transition-all active:scale-[0.98] hover:shadow-[0_25px_50px_rgba(0,0,0,0.08)]"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-tr from-gray-50 via-white to-gray-50 opacity-50" />
+                  <div className="relative z-10 w-24 h-24 bg-[#F5F5F7] rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                     <Sparkles size={36} className="text-gray-400 group-hover:text-black transition-colors duration-500" />
+                  </div>
+                  <div className="relative z-10 text-center space-y-3">
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">New Scan</h2>
+                    <div className="flex items-center justify-center gap-3 text-gray-400 text-sm font-medium bg-white px-4 py-2 rounded-full shadow-sm">
+                      <Camera size={16} /> <span className="w-px h-3 bg-gray-200"></span> <ImageIcon size={16} />
+                    </div>
+                  </div>
+                </div>
+              )}
               <p className="mt-8 text-center text-sm text-gray-400 max-w-[260px] leading-relaxed">
                 Take a photo to identify NCS/RAL codes and material finishes instantly.
               </p>
@@ -1748,41 +1672,6 @@ const App = () => {
           communityItems={communityItems}
           onBack={() => setDetailColor(null)} 
         />
-      )}
-
-      {/* Auth Prompt Modal */}
-      {showAuthPrompt && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <User size={32} className="text-gray-400" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Sign in required</h2>
-              <p className="text-sm text-gray-500">
-                Create an account or sign in to scan and generate color palettes.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  setShowAuthPrompt(false);
-                  setActiveTab('profile');
-                }}
-                className="w-full bg-gray-900 text-white font-semibold py-4 rounded-2xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2"
-              >
-                <span>Sign In / Sign Up</span>
-                <ArrowRight size={18} />
-              </button>
-              <button
-                onClick={() => setShowAuthPrompt(false)}
-                className="w-full text-gray-500 font-medium py-3 hover:text-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* --- Bottom Navigation --- */}
