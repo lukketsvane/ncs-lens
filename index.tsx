@@ -479,13 +479,7 @@ interface SimilarColorResult {
 }
 
 const ColorDetailView = ({ color, history, communityItems, onBack }: { color: ColorMatch, history: HistoryItem[], communityItems: HistoryItem[], onBack: () => void }) => {
-  const contrastText = getContrastColor(color.hex);
   const isNCS = color.system === 'NCS';
-  
-  // Use API data if available, fallback to regex parsing
-  const blackness = color.blackness || parseNCSStr(color.code)?.blackness || "--";
-  const chroma = color.chromaticness || parseNCSStr(color.code)?.chroma || "--";
-  const hue = color.hue || parseNCSStr(color.code)?.hue || "";
   
   const [activeTab, setActiveTab] = useState<'details' | 'combinations' | 'compare' | 'wheel'>('details');
   const [compareColor, setCompareColor] = useState<ColorMatch | null>(null);
@@ -503,6 +497,23 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
     }
     return hexToNcsApprox(color.hex);
   });
+  
+  // Compute display values based on whether wheel tab is active
+  // When wheel tab is active, use wheelColor values for the top color frame
+  const displayHex = activeTab === 'wheel' ? ncsToCss(wheelColor) : color.hex;
+  const displayHexForContrast = activeTab === 'wheel' ? ncsToHex(wheelColor) : color.hex;
+  const contrastText = getContrastColor(displayHexForContrast);
+  
+  // Use API data if available, fallback to regex parsing (or wheel values when wheel tab is active)
+  const blackness = activeTab === 'wheel' 
+    ? Math.round(wheelColor.blackness).toString().padStart(2, '0')
+    : (color.blackness || parseNCSStr(color.code)?.blackness || "--");
+  const chroma = activeTab === 'wheel'
+    ? Math.round(wheelColor.chromaticness).toString().padStart(2, '0')
+    : (color.chromaticness || parseNCSStr(color.code)?.chroma || "--");
+  const hue = activeTab === 'wheel'
+    ? (wheelColor.chromaticness < 2 ? 'N' : degreesToNcsHue(wheelColor.hue))
+    : (color.hue || parseNCSStr(color.code)?.hue || "");
   
   // Calculate similar colors from history and community
   const similarColors = React.useMemo(() => {
@@ -560,7 +571,7 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
       <div 
         className={`relative pt-safe-top pb-8 px-6 transition-all duration-500 shadow-sm z-10 flex flex-col`}
         style={{ 
-          backgroundColor: color.hex,
+          backgroundColor: displayHex,
           height: activeTab === 'compare' && compareColor ? '50%' : 'auto',
           minHeight: activeTab === 'compare' && compareColor ? '0' : '35%'
         }}
@@ -774,42 +785,6 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
 
         {activeTab === 'wheel' && (
           <div className="h-full flex flex-col animate-in fade-in bg-[#f2f2f2]">
-            {/* Wheel Header with current color info */}
-            <div 
-              className="w-full py-6 px-6 transition-colors duration-300"
-              style={{ backgroundColor: ncsToCss(wheelColor) }}
-            >
-              {(() => {
-                const ncsHue = degreesToNcsHue(wheelColor.hue);
-                const sStr = Math.round(wheelColor.blackness).toString().padStart(2, '0');
-                const cStr = Math.round(wheelColor.chromaticness).toString().padStart(2, '0');
-                const isNeutralColor = wheelColor.chromaticness < 2;
-                const isDark = wheelColor.blackness > 40;
-                const textColor = isDark ? "text-white" : "text-gray-900";
-                const labelColor = isDark ? "text-white/60" : "text-gray-600";
-                const dividerOpacity = isDark ? "opacity-40" : "opacity-20";
-                
-                return (
-                  <div className={`max-w-md mx-auto flex items-center justify-center font-sans ${textColor}`}>
-                    <div className="flex flex-col items-center">
-                      <div className={`flex gap-6 text-[10px] font-bold tracking-widest uppercase mb-1 ${labelColor}`}>
-                        <span>Blackness</span><span>Chroma</span>
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-light">S</span>
-                        <div className="flex gap-2 ml-1">
-                          <span className="text-4xl font-normal tracking-tight">{sStr}</span>
-                          <span className="text-4xl font-normal tracking-tight">{cStr}</span>
-                        </div>
-                        <span className={`text-3xl font-light ${dividerOpacity} mx-2`}>-</span>
-                        <span className="text-3xl font-normal tracking-tight">{isNeutralColor ? 'N' : ncsHue}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
             {/* NCS Wheel */}
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-md mx-auto relative p-4">
               <div className="relative flex items-center justify-center" style={{ width: 280, height: 280 }}>
@@ -1540,6 +1515,11 @@ const App = () => {
       }
       
       setHistory(h => h.filter(i => i.id !== id));
+      
+      // Also remove from community items if it was shared (public)
+      if (item?.isPublic) {
+        setCommunityItems(prev => prev.filter(i => i.id !== id));
+      }
     }
   };
 
