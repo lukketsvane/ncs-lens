@@ -39,18 +39,29 @@ export interface RGB {
 // --- Color Conversion Functions ---
 
 /**
+ * Apply sRGB gamma correction (inverse companding)
+ */
+function srgbGammaCorrection(value: number): number {
+  return value > 0.04045 ? Math.pow((value + 0.055) / 1.055, 2.4) : value / 12.92;
+}
+
+/**
+ * Apply LAB f(t) function for XYZ to LAB conversion
+ */
+function labFt(t: number): number {
+  const epsilon = 0.008856;
+  const kappa = 903.3;
+  return t > epsilon ? Math.pow(t, 1/3) : (kappa * t + 16) / 116;
+}
+
+/**
  * Convert RGB to XYZ color space (D65 illuminant)
  */
 export function rgbToXyz(r: number, g: number, b: number): { x: number; y: number; z: number } {
-  // Normalize RGB values to 0-1
-  let rNorm = r / 255;
-  let gNorm = g / 255;
-  let bNorm = b / 255;
-
-  // Apply sRGB gamma correction (inverse companding)
-  rNorm = rNorm > 0.04045 ? Math.pow((rNorm + 0.055) / 1.055, 2.4) : rNorm / 12.92;
-  gNorm = gNorm > 0.04045 ? Math.pow((gNorm + 0.055) / 1.055, 2.4) : gNorm / 12.92;
-  bNorm = bNorm > 0.04045 ? Math.pow((bNorm + 0.055) / 1.055, 2.4) : bNorm / 12.92;
+  // Normalize RGB values to 0-1 and apply sRGB gamma correction
+  const rNorm = srgbGammaCorrection(r / 255);
+  const gNorm = srgbGammaCorrection(g / 255);
+  const bNorm = srgbGammaCorrection(b / 255);
 
   // Convert to XYZ using sRGB to XYZ matrix (D65 illuminant)
   const x = rNorm * 0.4124564 + gNorm * 0.3575761 + bNorm * 0.1804375;
@@ -69,18 +80,10 @@ export function xyzToLab(x: number, y: number, z: number): LAB {
   const refY = 100.000;
   const refZ = 108.883;
 
-  // Normalize
-  let xNorm = x / refX;
-  let yNorm = y / refY;
-  let zNorm = z / refZ;
-
-  // Apply f(t) function
-  const epsilon = 0.008856;
-  const kappa = 903.3;
-
-  xNorm = xNorm > epsilon ? Math.pow(xNorm, 1/3) : (kappa * xNorm + 16) / 116;
-  yNorm = yNorm > epsilon ? Math.pow(yNorm, 1/3) : (kappa * yNorm + 16) / 116;
-  zNorm = zNorm > epsilon ? Math.pow(zNorm, 1/3) : (kappa * zNorm + 16) / 116;
+  // Normalize and apply f(t) function
+  const xNorm = labFt(x / refX);
+  const yNorm = labFt(y / refY);
+  const zNorm = labFt(z / refZ);
 
   const l = 116 * yNorm - 16;
   const a = 500 * (xNorm - yNorm);
@@ -381,26 +384,29 @@ function generateColorName(blackness: number, chromaticness: number, hue: string
   else if (chromaticness >= 20) satDesc = '';
   else satDesc = 'Pale';
   
-  // Hue name
+  // Hue name - extract numeric value once to avoid redundant regex
   let hueName = '';
   const h = hue.toUpperCase();
-  if (h === 'Y' || h.startsWith('Y') && h.includes('R') && parseInt(h.match(/\d+/)?.[0] || '0') < 50) {
+  const numMatch = h.match(/\d+/);
+  const numValue = numMatch ? parseInt(numMatch[0], 10) : 0;
+  
+  if (h === 'Y' || (h.startsWith('Y') && h.includes('R') && numValue < 50)) {
     hueName = 'Yellow';
-  } else if (h.includes('Y') && h.includes('R') && parseInt(h.match(/\d+/)?.[0] || '0') >= 50) {
+  } else if (h.includes('Y') && h.includes('R') && numValue >= 50) {
     hueName = 'Orange';
-  } else if (h === 'R' || h.startsWith('R') && h.includes('B') && parseInt(h.match(/\d+/)?.[0] || '0') < 30) {
+  } else if (h === 'R' || (h.startsWith('R') && h.includes('B') && numValue < 30)) {
     hueName = 'Red';
-  } else if (h.startsWith('R') && h.includes('B') && parseInt(h.match(/\d+/)?.[0] || '0') >= 30 && parseInt(h.match(/\d+/)?.[0] || '0') < 70) {
+  } else if (h.startsWith('R') && h.includes('B') && numValue >= 30 && numValue < 70) {
     hueName = 'Magenta';
-  } else if (h.startsWith('R') && h.includes('B') && parseInt(h.match(/\d+/)?.[0] || '0') >= 70) {
+  } else if (h.startsWith('R') && h.includes('B') && numValue >= 70) {
     hueName = 'Purple';
-  } else if (h === 'B' || h.startsWith('B') && h.includes('G') && parseInt(h.match(/\d+/)?.[0] || '0') < 50) {
+  } else if (h === 'B' || (h.startsWith('B') && h.includes('G') && numValue < 50)) {
     hueName = 'Blue';
-  } else if (h.startsWith('B') && h.includes('G') && parseInt(h.match(/\d+/)?.[0] || '0') >= 50) {
+  } else if (h.startsWith('B') && h.includes('G') && numValue >= 50) {
     hueName = 'Teal';
-  } else if (h === 'G' || h.startsWith('G') && h.includes('Y') && parseInt(h.match(/\d+/)?.[0] || '0') < 50) {
+  } else if (h === 'G' || (h.startsWith('G') && h.includes('Y') && numValue < 50)) {
     hueName = 'Green';
-  } else if (h.startsWith('G') && h.includes('Y') && parseInt(h.match(/\d+/)?.[0] || '0') >= 50) {
+  } else if (h.startsWith('G') && h.includes('Y') && numValue >= 50) {
     hueName = 'Lime';
   } else {
     hueName = 'Color';
@@ -412,6 +418,8 @@ function generateColorName(blackness: number, chromaticness: number, hue: string
 
 /**
  * Parse NCS code string to extract components
+ * Supports both hyphen (-) and en-dash (–) as separators for compatibility
+ * with different text sources
  */
 export function parseNcsCode(code: string): { blackness: number; chromaticness: number; hue: string } | null {
   // Match patterns like "S 1050-Y90R", "S 0500-N", "S 2030-Y"

@@ -11,7 +11,7 @@
  */
 
 import type { LAB, RGB } from './ncs-colors';
-import { findNearestNcsColor, rgbToLab, hexToRgb, calculateLrv } from './ncs-colors';
+import { findNearestNcsColor, rgbToLab, hexToRgb, calculateLrv, rgbToHex } from './ncs-colors';
 
 // --- Types ---
 
@@ -91,12 +91,12 @@ export function parseColorPinCsv(csvContent: string): ColorPinEntry[] {
   }
   
   // Parse header row - handle duplicate column names (e.g., LAB-b and RGB-b)
-  // ColorPin CSV column order: L, a, b (LAB), r, g, b (RGB), hex
-  // We need to disambiguate the 'b' columns by position
+  // ColorPin CSV column order per illuminant/observer: L, a, b (LAB), r, g, b (RGB), hex
+  // We need to disambiguate duplicate columns by appending occurrence count
   const headers = parseCSVRow(lines[0]);
   const headerIndex = new Map<string, number>();
   
-  // Track seen headers to handle duplicates
+  // Track seen headers to handle duplicates with occurrence count
   const seenHeaders = new Map<string, number>();
   headers.forEach((h, i) => {
     const key = h.toLowerCase().trim();
@@ -105,8 +105,12 @@ export function parseColorPinCsv(csvContent: string): ColorPinEntry[] {
     if (count === 0) {
       headerIndex.set(key, i);
     } else {
-      // For duplicates, append a suffix (e.g., 'a-2deg-b' becomes 'a-2deg-b-rgb' for the second occurrence)
-      headerIndex.set(`${key}-rgb`, i);
+      // For duplicates, append occurrence count suffix
+      // This handles the case where 'b' appears twice (LAB-b and RGB-b)
+      // First 'b' is stored as-is, second 'b' becomes 'b-rgb' (for backwards compatibility)
+      // Third occurrence would be 'b-2', etc.
+      const suffix = count === 1 ? '-rgb' : `-${count}`;
+      headerIndex.set(`${key}${suffix}`, i);
     }
     seenHeaders.set(key, count + 1);
   });
@@ -356,7 +360,7 @@ export function createColorPinEntryFromRgb(
   }
 ): ColorPinEntry {
   const lab = rgbToLab(rgb.r, rgb.g, rgb.b);
-  const hex = `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`.toUpperCase();
+  const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
   const lrv = calculateLrv(rgb.r, rgb.g, rgb.b);
   
   const nearest = findNearestNcsColor(hex, 1);
