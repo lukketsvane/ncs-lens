@@ -41,6 +41,7 @@ import { uploadImage, deleteImage } from "./lib/storage";
 
 // --- Constants ---
 const EDGE_CONFIG_STORE_ID = "ecfg_xlrdrn2ms13tkf3hezgonww7tpbk"; // Prepared for backend integration
+const MAX_SIMILAR_COLOR_DISTANCE = 30; // Delta E threshold for "similar" colors
 
 // --- Types ---
 
@@ -297,7 +298,6 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
   const similarColors = React.useMemo(() => {
     const results: SimilarColorResult[] = [];
     const seen = new Set<string>();
-    const MAX_DISTANCE = 30; // Delta E threshold for "similar" colors
     
     // Helper to process items
     const processItems = (items: HistoryItem[], source: 'history' | 'community') => {
@@ -305,7 +305,7 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
         item.result.colors.forEach(c => {
           if (c.code !== color.code && !seen.has(c.code)) {
             const distance = calculateColorDistance(color.hex, c.hex);
-            if (distance <= MAX_DISTANCE) {
+            if (distance <= MAX_SIMILAR_COLOR_DISTANCE) {
               results.push({
                 color: c,
                 distance,
@@ -634,7 +634,7 @@ const ColorDetailView = ({ color, history, communityItems, onBack }: { color: Co
                   <div className="text-right">
                     <p className="text-xs text-gray-400">Match</p>
                     <p className="font-semibold text-gray-900">
-                      {Math.round(100 - (item.distance / 30) * 100)}%
+                      {Math.round(100 - (item.distance / MAX_SIMILAR_COLOR_DISTANCE) * 100)}%
                     </p>
                   </div>
                 </div>

@@ -208,8 +208,8 @@ export async function likeScan(scanId: string, userId: string): Promise<boolean>
     .insert({ scan_id: scanId, user_id: userId });
 
   if (error) {
-    // Ignore duplicate like errors
-    if (error.code === '23505') {
+    // Ignore duplicate like errors (Postgres unique constraint violation)
+    if (error.code === '23505') { // UNIQUE_VIOLATION
       return true;
     }
     console.error('Error liking scan:', error);
@@ -265,7 +265,7 @@ export async function hasUserLiked(scanId: string, userId: string): Promise<bool
     .eq('user_id', userId)
     .single();
 
-  if (error && error.code !== 'PGRST116') {
+  if (error && error.code !== 'PGRST116') { // PGRST116 = No rows found
     console.error('Error checking like status:', error);
     return false;
   }
