@@ -1121,7 +1121,7 @@ const App = () => {
           onPublish={user && !detailItem.author ? handlePublish : undefined}
           onUnpublish={user && !detailItem.author ? handleUnpublish : undefined}
           onUpdate={user && !detailItem.author ? handleUpdateResult : undefined}
-          isOwner={user && !detailItem.author ? true : false}
+          isOwner={!!(user && !detailItem.author)}
         />
       )}
       
