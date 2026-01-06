@@ -39,6 +39,14 @@ import { ProfilePage } from "./components/ProfilePage";
 import { getUserScans, getPublicScans, createScan, updateScan, deleteScan, publishScan, unpublishScan, likeScan, unlikeScan, getLikesInfo, ScanRecord } from "./lib/scans";
 import { uploadImage, deleteImage } from "./lib/storage";
 import { HueRing, TrianglePicker, NCSColor, degreesToNcsHue, ncsToCss } from "./ncs-wheel";
+import { 
+  snapToNcsStandard, 
+  findNearestNcsColor, 
+  getMatchConfidence,
+  rgbToLab as ncsRgbToLab,
+  deltaE2000,
+  hexToRgb as ncsHexToRgb
+} from "./lib/ncs-colors";
 
 // --- Constants ---
 const EDGE_CONFIG_STORE_ID = "ecfg_xlrdrn2ms13tkf3hezgonww7tpbk"; // Prepared for backend integration
@@ -183,7 +191,13 @@ Return the data in the specified JSON schema.`,
 
   const text = response.text;
   if (!text) throw new Error("No response");
-  return JSON.parse(text) as AnalysisResult;
+  
+  const result = JSON.parse(text) as AnalysisResult;
+  
+  // Snap AI-generated NCS colors to valid NCS standards
+  result.colors = snapColorsToNcsStandards(result.colors);
+  
+  return result;
 };
 
 // --- Helper Functions ---
@@ -197,51 +211,81 @@ const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
   } : null;
 };
 
-// Calculate color distance using CIE76 Delta E formula (simplified)
+// Calculate color distance using CIE2000 Delta E formula (perceptually uniform)
 // Lower values mean more similar colors
 const calculateColorDistance = (hex1: string, hex2: string): number => {
-  const rgb1 = hexToRgb(hex1);
-  const rgb2 = hexToRgb(hex2);
+  const rgb1 = ncsHexToRgb(hex1);
+  const rgb2 = ncsHexToRgb(hex2);
   
   if (!rgb1 || !rgb2) return Infinity;
   
-  // Convert RGB to LAB color space for more perceptually uniform comparison
-  const rgbToLab = (r: number, g: number, b: number) => {
-    // Normalize RGB to 0-1
-    let rNorm = r / 255;
-    let gNorm = g / 255;
-    let bNorm = b / 255;
-    
-    // Convert to XYZ
-    rNorm = rNorm > 0.04045 ? Math.pow((rNorm + 0.055) / 1.055, 2.4) : rNorm / 12.92;
-    gNorm = gNorm > 0.04045 ? Math.pow((gNorm + 0.055) / 1.055, 2.4) : gNorm / 12.92;
-    bNorm = bNorm > 0.04045 ? Math.pow((bNorm + 0.055) / 1.055, 2.4) : bNorm / 12.92;
-    
-    const x = (rNorm * 0.4124 + gNorm * 0.3576 + bNorm * 0.1805) / 0.95047;
-    const y = (rNorm * 0.2126 + gNorm * 0.7152 + bNorm * 0.0722) / 1.00000;
-    const z = (rNorm * 0.0193 + gNorm * 0.1192 + bNorm * 0.9505) / 1.08883;
-    
-    // Convert to LAB
-    const xLab = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
-    const yLab = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
-    const zLab = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
-    
-    return {
-      l: (116 * yLab) - 16,
-      a: 500 * (xLab - yLab),
-      b: 200 * (yLab - zLab)
-    };
-  };
+  const lab1 = ncsRgbToLab(rgb1.r, rgb1.g, rgb1.b);
+  const lab2 = ncsRgbToLab(rgb2.r, rgb2.g, rgb2.b);
   
-  const lab1 = rgbToLab(rgb1.r, rgb1.g, rgb1.b);
-  const lab2 = rgbToLab(rgb2.r, rgb2.g, rgb2.b);
-  
-  // CIE76 Delta E
-  return Math.sqrt(
-    Math.pow(lab2.l - lab1.l, 2) +
-    Math.pow(lab2.a - lab1.a, 2) +
-    Math.pow(lab2.b - lab1.b, 2)
-  );
+  return deltaE2000(lab1, lab2);
+};
+
+/**
+ * Snap AI-generated NCS colors to valid NCS standards
+ * This ensures the AI output matches actual NCS color codes
+ */
+const snapColorsToNcsStandards = (colors: ColorMatch[]): ColorMatch[] => {
+  return colors.map(color => {
+    // Only process NCS colors
+    if (color.system !== 'NCS') return color;
+    
+    // Try to snap to a valid NCS standard
+    const snapped = snapToNcsStandard(color.code);
+    
+    if (snapped && snapped.distance > 0) {
+      // The AI-generated code was not an exact match, update with the correct standard
+      const ncsColor = snapped.snapped;
+      return {
+        ...color,
+        code: ncsColor.code,
+        name: ncsColor.name || color.name,
+        hex: ncsColor.hex,
+        lrv: String(ncsColor.lrv),
+        rgb: `${ncsColor.rgb.r}, ${ncsColor.rgb.g}, ${ncsColor.rgb.b}`,
+        blackness: String(ncsColor.blackness).padStart(2, '0'),
+        chromaticness: String(ncsColor.chromaticness).padStart(2, '0'),
+        hue: ncsColor.hue,
+        confidence: getMatchConfidence(snapped.distance)
+      };
+    } else if (snapped && snapped.distance === 0) {
+      // Exact match - enrich with database data
+      const ncsColor = snapped.snapped;
+      return {
+        ...color,
+        hex: ncsColor.hex,
+        lrv: String(ncsColor.lrv),
+        rgb: `${ncsColor.rgb.r}, ${ncsColor.rgb.g}, ${ncsColor.rgb.b}`,
+        blackness: String(ncsColor.blackness).padStart(2, '0'),
+        chromaticness: String(ncsColor.chromaticness).padStart(2, '0'),
+        hue: ncsColor.hue
+      };
+    } else {
+      // Could not find a match - try finding by hex color
+      const nearest = findNearestNcsColor(color.hex, 1);
+      if (nearest.length > 0) {
+        const ncsColor = nearest[0].color;
+        return {
+          ...color,
+          code: ncsColor.code,
+          name: ncsColor.name || color.name,
+          hex: ncsColor.hex,
+          lrv: String(ncsColor.lrv),
+          rgb: `${ncsColor.rgb.r}, ${ncsColor.rgb.g}, ${ncsColor.rgb.b}`,
+          blackness: String(ncsColor.blackness).padStart(2, '0'),
+          chromaticness: String(ncsColor.chromaticness).padStart(2, '0'),
+          hue: ncsColor.hue,
+          confidence: getMatchConfidence(nearest[0].distance)
+        };
+      }
+    }
+    
+    return color;
+  });
 };
 
 const getContrastColor = (hex: string) => {
