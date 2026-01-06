@@ -198,3 +198,113 @@ export async function unpublishScan(scanId: string): Promise<boolean> {
 
   return true;
 }
+
+/**
+ * Like a scan
+ */
+export async function likeScan(scanId: string, userId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('likes')
+    .insert({ scan_id: scanId, user_id: userId });
+
+  if (error) {
+    // Ignore duplicate like errors
+    if (error.code === '23505') {
+      return true;
+    }
+    console.error('Error liking scan:', error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Unlike a scan
+ */
+export async function unlikeScan(scanId: string, userId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('likes')
+    .delete()
+    .eq('scan_id', scanId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error unliking scan:', error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Get like count for a scan
+ */
+export async function getLikeCount(scanId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('scan_id', scanId);
+
+  if (error) {
+    console.error('Error getting like count:', error);
+    return 0;
+  }
+
+  return count || 0;
+}
+
+/**
+ * Check if user has liked a scan
+ */
+export async function hasUserLiked(scanId: string, userId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('likes')
+    .select('id')
+    .eq('scan_id', scanId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error checking like status:', error);
+    return false;
+  }
+
+  return !!data;
+}
+
+/**
+ * Get likes info for multiple scans (batch query for efficiency)
+ */
+export async function getLikesInfo(scanIds: string[], userId?: string): Promise<Map<string, { count: number; liked: boolean }>> {
+  const result = new Map<string, { count: number; liked: boolean }>();
+  
+  if (scanIds.length === 0) return result;
+
+  // Get all likes for the given scans
+  const { data: likes, error } = await supabase
+    .from('likes')
+    .select('scan_id, user_id')
+    .in('scan_id', scanIds);
+
+  if (error) {
+    console.error('Error getting likes info:', error);
+    return result;
+  }
+
+  // Initialize results
+  scanIds.forEach(id => result.set(id, { count: 0, liked: false }));
+
+  // Count likes and check user's likes
+  likes?.forEach(like => {
+    const info = result.get(like.scan_id);
+    if (info) {
+      info.count++;
+      if (userId && like.user_id === userId) {
+        info.liked = true;
+      }
+    }
+  });
+
+  return result;
+}
