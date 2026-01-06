@@ -14,24 +14,28 @@ import {
   Copy, 
   Layers, 
   Eye, 
+  EyeOff,
   Plus, 
   Trash2, 
   X, 
   Hammer, 
   RefreshCw,
   Globe,
+  Lock,
   CheckCircle2,
   Search,
   Palette,
   Droplet,
   ArrowRightLeft,
   XCircle,
-  User
+  User,
+  Pencil,
+  Check
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./components/AuthContext";
 import { AuthPage } from "./components/AuthPage";
 import { ProfilePage } from "./components/ProfilePage";
-import { getUserScans, getPublicScans, createScan, updateScan, deleteScan, publishScan, ScanRecord } from "./lib/scans";
+import { getUserScans, getPublicScans, createScan, updateScan, deleteScan, publishScan, unpublishScan, ScanRecord } from "./lib/scans";
 import { uploadImage, deleteImage } from "./lib/storage";
 
 // --- Constants ---
@@ -76,6 +80,7 @@ interface HistoryItem {
   image: string;
   result: AnalysisResult;
   author?: string; // New: For community items
+  isPublic?: boolean; // For tracking visibility
 }
 
 type Tab = 'scan' | 'history' | 'community' | 'profile';
@@ -471,26 +476,50 @@ const ResultView = ({
   onBack, 
   onColorSelect, 
   onRegenerate,
-  onPublish
+  onPublish,
+  onUnpublish,
+  onUpdate,
+  isOwner
 }: { 
   item: HistoryItem, 
   onBack: () => void, 
   onColorSelect: (c: ColorMatch) => void,
   onRegenerate?: () => void,
-  onPublish?: () => void
+  onPublish?: () => void,
+  onUnpublish?: () => void,
+  onUpdate?: (updates: Partial<AnalysisResult>) => void,
+  isOwner?: boolean
 }) => {
   const { image, result } = item;
   const [isPublishing, setIsPublishing] = useState(false);
-  const [published, setPublished] = useState(false);
+  const [isUnpublishing, setIsUnpublishing] = useState(false);
+  const [isPublic, setIsPublic] = useState(item.isPublic ?? false);
+  
+  // Edit state
+  const [editingProductType, setEditingProductType] = useState(false);
+  const [editedProductType, setEditedProductType] = useState(result.productType);
 
   const handlePublish = async () => {
-    if (published || !onPublish) return;
+    if (isPublic || !onPublish) return;
     setIsPublishing(true);
-    // Simulate API delay
-    await new Promise(r => setTimeout(r, 1200));
-    onPublish();
-    setPublished(true);
+    await onPublish();
+    setIsPublic(true);
     setIsPublishing(false);
+  };
+
+  const handleUnpublish = async () => {
+    if (!isPublic || !onUnpublish) return;
+    setIsUnpublishing(true);
+    await onUnpublish();
+    setIsPublic(false);
+    setIsUnpublishing(false);
+  };
+
+  const handleSaveProductType = () => {
+    if (onUpdate && editedProductType !== result.productType) {
+      onUpdate({ productType: editedProductType });
+    }
+    setEditingProductType(false);
   };
 
   return (
@@ -500,15 +529,67 @@ const ResultView = ({
           <button onClick={onBack} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-100">
              <ChevronLeft size={20} />
           </button>
-          <div className="font-semibold truncate max-w-[200px] text-center">{result.productType}</div>
           
-          <button 
-            onClick={handlePublish}
-            disabled={isPublishing || published || !onPublish}
-            className={`p-2 rounded-full shadow-sm transition-all duration-300 ${published ? 'bg-green-100 text-green-700' : 'bg-white text-gray-900'}`}
-          >
-             {isPublishing ? <Loader2 size={20} className="animate-spin" /> : published ? <CheckCircle2 size={20} /> : <Share2 size={20} />}
-          </button>
+          {/* Product Type - Editable if owner */}
+          <div className="flex items-center gap-1 max-w-[200px]">
+            {editingProductType ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={editedProductType}
+                  onChange={(e) => setEditedProductType(e.target.value)}
+                  className="font-semibold text-center bg-white px-2 py-1 rounded-lg text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/10 max-w-[160px]"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveProductType();
+                    if (e.key === 'Escape') {
+                      setEditedProductType(result.productType);
+                      setEditingProductType(false);
+                    }
+                  }}
+                />
+                <button 
+                  onClick={handleSaveProductType}
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                >
+                  <Check size={14} className="text-green-600" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <span className="font-semibold truncate text-center">{result.productType}</span>
+                {isOwner && (
+                  <button 
+                    onClick={() => setEditingProductType(true)}
+                    className="p-1 hover:bg-gray-100 rounded-full opacity-40 hover:opacity-100 transition-opacity"
+                    title="Edit product name"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+          
+          {/* Visibility Toggle for owners */}
+          {isOwner ? (
+            <button 
+              onClick={isPublic ? handleUnpublish : handlePublish}
+              disabled={isPublishing || isUnpublishing}
+              className={`p-2 rounded-full shadow-sm transition-all duration-300 ${isPublic ? 'bg-green-100 text-green-700' : 'bg-white text-gray-500'}`}
+              title={isPublic ? 'Public - click to make private' : 'Private - click to publish'}
+            >
+               {(isPublishing || isUnpublishing) ? (
+                 <Loader2 size={20} className="animate-spin" />
+               ) : isPublic ? (
+                 <Globe size={20} />
+               ) : (
+                 <Lock size={20} />
+               )}
+            </button>
+          ) : (
+            <div className="w-10" /> // Spacer for non-owners
+          )}
         </div>
 
         <div className="max-w-md mx-auto space-y-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
@@ -594,30 +675,101 @@ const GridView = ({
   items, 
   title, 
   onSelect,
-  onDelete
+  onDelete,
+  enableSearch = false
 }: { 
   items: HistoryItem[], 
   title: string, 
   onSelect: (item: HistoryItem) => void,
-  onDelete?: (id: string) => void
+  onDelete?: (id: string) => void,
+  enableSearch?: boolean
 }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Filter items based on search query
+  const filteredItems = React.useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return items.filter(item => {
+      // Search in product type
+      if (item.result.productType.toLowerCase().includes(query)) return true;
+      
+      // Search in materials
+      if (item.result.materials.some(m => 
+        m.name.toLowerCase().includes(query) || 
+        m.finish.toLowerCase().includes(query)
+      )) return true;
+      
+      // Search in color names and codes
+      if (item.result.colors.some(c => 
+        c.name.toLowerCase().includes(query) || 
+        c.code.toLowerCase().includes(query)
+      )) return true;
+      
+      // Search in author
+      if (item.author && item.author.toLowerCase().includes(query)) return true;
+      
+      return false;
+    });
+  }, [items, searchQuery]);
+
   return (
     <div className="min-h-full p-4 pb-24 safe-area-top">
        <div className="flex items-center justify-between mb-6 px-1">
-         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-         <div className="p-2 bg-white rounded-full shadow-sm">
-           <Search size={20} className="text-gray-400" />
-         </div>
+         {showSearch ? (
+           <div className="flex-1 flex items-center gap-2">
+             <div className="flex-1 relative">
+               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+               <input
+                 type="text"
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 placeholder="Search products, colors, materials..."
+                 className="w-full pl-9 pr-4 py-2.5 bg-white rounded-xl text-sm font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 shadow-sm"
+                 autoFocus
+               />
+             </div>
+             <button 
+               onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+               className="p-2 text-gray-500 hover:text-gray-700"
+             >
+               <X size={20} />
+             </button>
+           </div>
+         ) : (
+           <>
+             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+             {enableSearch && (
+               <button 
+                 onClick={() => setShowSearch(true)}
+                 className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors"
+               >
+                 <Search size={20} className="text-gray-400" />
+               </button>
+             )}
+           </>
+         )}
        </div>
 
-       {items.length === 0 ? (
+       {filteredItems.length === 0 ? (
          <div className="flex flex-col items-center justify-center h-[50vh] text-gray-400">
-           {title === 'Discover' ? <Globe size={48} className="mb-4 opacity-20" /> : <Layers size={48} className="mb-4 opacity-20" />}
-           <p>{title === 'Discover' ? 'No shared items yet' : 'Collection is empty'}</p>
+           {searchQuery ? (
+             <>
+               <Search size={48} className="mb-4 opacity-20" />
+               <p>No results for "{searchQuery}"</p>
+             </>
+           ) : (
+             <>
+               {title === 'Discover' ? <Globe size={48} className="mb-4 opacity-20" /> : <Layers size={48} className="mb-4 opacity-20" />}
+               <p>{title === 'Discover' ? 'No shared items yet' : 'Collection is empty'}</p>
+             </>
+           )}
          </div>
        ) : (
          <div className="grid grid-cols-2 gap-3">
-           {items.map((item) => (
+           {filteredItems.map((item) => (
              <div 
                 key={item.id} 
                 onClick={() => onSelect(item)} 
@@ -683,6 +835,7 @@ const App = () => {
             timestamp: new Date(scan.created_at).getTime(),
             image: scan.image_url,
             result: scan.result,
+            isPublic: scan.is_public,
           }));
           setHistory(historyItems);
         } else {
@@ -697,6 +850,7 @@ const App = () => {
           image: scan.image_url,
           result: scan.result,
           author: scan.author || 'Anonymous',
+          isPublic: true,
         }));
         setCommunityItems(communityItems);
       } catch (error) {
@@ -739,7 +893,8 @@ const App = () => {
             id: scan.id,
             timestamp: new Date(scan.created_at).getTime(),
             image: imageUrl,
-            result: result
+            result: result,
+            isPublic: false
           };
           setHistory(prev => [newItem, ...prev]);
           setDetailItem(newItem);
@@ -803,9 +958,54 @@ const App = () => {
     const success = await publishScan(detailItem.id);
     
     if (success) {
+      // Update local state
+      const updatedItem = { ...detailItem, isPublic: true };
+      setDetailItem(updatedItem);
+      setHistory(prev => prev.map(item => item.id === detailItem.id ? updatedItem : item));
+      
       // Add to community items locally
-      const publishedItem = { ...detailItem, author: "You" };
+      const publishedItem = { ...updatedItem, author: "You" };
       setCommunityItems(prev => [publishedItem, ...prev]);
+    }
+  };
+
+  const handleUnpublish = async () => {
+    if (!detailItem) return;
+    
+    // Unpublish from Supabase
+    const success = await unpublishScan(detailItem.id);
+    
+    if (success) {
+      // Update local state
+      const updatedItem = { ...detailItem, isPublic: false };
+      setDetailItem(updatedItem);
+      setHistory(prev => prev.map(item => item.id === detailItem.id ? updatedItem : item));
+      
+      // Remove from community items locally
+      setCommunityItems(prev => prev.filter(item => item.id !== detailItem.id));
+    }
+  };
+
+  const handleUpdateResult = async (updates: Partial<AnalysisResult>) => {
+    if (!detailItem) return;
+    
+    // Merge updates with existing result
+    const newResult = { ...detailItem.result, ...updates };
+    
+    // Update in Supabase
+    const success = await updateScan(detailItem.id, { result: newResult });
+    
+    if (success) {
+      const updatedItem = { ...detailItem, result: newResult };
+      setDetailItem(updatedItem);
+      setHistory(prev => prev.map(item => item.id === detailItem.id ? updatedItem : item));
+      
+      // Also update in community items if it's public
+      if (detailItem.isPublic) {
+        setCommunityItems(prev => prev.map(item => 
+          item.id === detailItem.id ? { ...item, result: newResult } : item
+        ));
+      }
     }
   };
 
@@ -901,7 +1101,8 @@ const App = () => {
           <GridView 
             items={communityItems} 
             title="Discover" 
-            onSelect={setDetailItem} 
+            onSelect={setDetailItem}
+            enableSearch={true}
           />
         )}
 
@@ -916,8 +1117,11 @@ const App = () => {
           item={detailItem} 
           onBack={() => setDetailItem(null)} 
           onColorSelect={setDetailColor}
-          onRegenerate={user && !detailItem.author ? handleRegenerate : undefined} // Only regenerate own items when logged in
-          onPublish={user && !detailItem.author ? handlePublish : undefined} // Only publish own items when logged in
+          onRegenerate={user && !detailItem.author ? handleRegenerate : undefined}
+          onPublish={user && !detailItem.author ? handlePublish : undefined}
+          onUnpublish={user && !detailItem.author ? handleUnpublish : undefined}
+          onUpdate={user && !detailItem.author ? handleUpdateResult : undefined}
+          isOwner={!!(user && !detailItem.author)}
         />
       )}
       
