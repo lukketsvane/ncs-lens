@@ -1265,6 +1265,7 @@ const GridView = ({
   onSelect,
   onDelete,
   onLike,
+  onColorSelect,
   enableSearch = false,
   showLikes = false,
   enableSort = false,
@@ -1275,6 +1276,7 @@ const GridView = ({
   onSelect: (item: HistoryItem) => void,
   onDelete?: (id: string) => void,
   onLike?: (id: string, isLiked: boolean) => void,
+  onColorSelect?: (color: ColorMatch) => void,
   enableSearch?: boolean,
   showLikes?: boolean,
   enableSort?: boolean,
@@ -1460,8 +1462,9 @@ const GridView = ({
                  {item.result.colors.slice(0, 4).map((c, i) => (
                    <div 
                      key={i} 
-                     className="flex-1" 
+                     className={`flex-1 ${onColorSelect ? 'hover:opacity-80 transition-opacity' : ''}`}
                      style={{ backgroundColor: c.hex }}
+                     onClick={onColorSelect ? (e) => { e.stopPropagation(); onColorSelect(c); } : undefined}
                    />
                  ))}
                </div>
@@ -1521,7 +1524,12 @@ const GridView = ({
                   <div className="flex items-center justify-between mt-2">
                     <div className="flex items-center gap-1">
                       {item.result.colors.slice(0, 3).map((c, i) => (
-                        <div key={i} className="w-3 h-3 rounded-full border border-black/5" style={{backgroundColor: c.hex}} />
+                        <div 
+                          key={i} 
+                          className={`w-3 h-3 rounded-full border border-black/5 ${onColorSelect ? 'cursor-pointer hover:scale-125 transition-transform' : ''}`} 
+                          style={{backgroundColor: c.hex}}
+                          onClick={onColorSelect ? (e) => { e.stopPropagation(); onColorSelect(c); } : undefined}
+                        />
                       ))}
                     </div>
                     {showLikes && onLike && (
@@ -1574,7 +1582,7 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [detailItem, setDetailItem] = useState<HistoryItem | null>(null);
   const [detailColor, setDetailColor] = useState<ColorMatch | null>(null);
-  const [salientMode, setSalientMode] = useState(false); // Salient mode: uses gemini-pro-3 with web search
+  const [salientMode, setSalientMode] = useState(false); // Salient mode: uses gemini-3-pro-preview with web search
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -2103,7 +2111,12 @@ const App = () => {
                           <h3 className="font-bold text-gray-900 text-sm truncate leading-tight">{item.result.productType}</h3>
                           <div className="flex items-center gap-1 mt-2">
                             {item.result.colors.slice(0, 3).map((c, i) => (
-                              <div key={i} className="w-3 h-3 rounded-full border border-black/5" style={{backgroundColor: c.hex}} />
+                              <div 
+                                key={i} 
+                                className="w-3 h-3 rounded-full border border-black/5 cursor-pointer hover:scale-125 transition-transform" 
+                                style={{backgroundColor: c.hex}}
+                                onClick={(e) => { e.stopPropagation(); setDetailColor(c); }}
+                              />
                             ))}
                           </div>
                         </div>
@@ -2167,6 +2180,7 @@ const App = () => {
             title="Discover" 
             onSelect={setDetailItem}
             onLike={handleLike}
+            onColorSelect={setDetailColor}
             enableSearch={true}
             showLikes={true}
             enableSort={true}
