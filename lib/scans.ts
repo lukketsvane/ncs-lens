@@ -181,3 +181,20 @@ export async function publishScan(scanId: string): Promise<boolean> {
 
   return true;
 }
+
+/**
+ * Unpublish a scan (make it private)
+ */
+export async function unpublishScan(scanId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('scans')
+    .update({ is_public: false, updated_at: new Date().toISOString() })
+    .eq('id', scanId);
+
+  if (error) {
+    console.error('Error unpublishing scan:', error);
+    return false;
+  }
+
+  return true;
+}
