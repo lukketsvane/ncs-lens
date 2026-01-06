@@ -4,7 +4,8 @@ A Progressive Web App (PWA) that uses Artificial Intelligence to analyze product
 
 ## Features
 
-*   **AI Analysis**: Identifies products, materials, textures, and finishes using Google Gemini.
+*   **AI Analysis**: Identifies products, materials, textures, and finishes using Google Gemini 2.5 Pro with web search capability.
+*   **Product Recognition**: When a known product is identified, searches the web for official manufacturer color codes (NCS/RAL).
 *   **Precision Color Matching**: Matches colors to NCS S-Series and RAL Classic standards with lighting correction.
 *   **Technical Specifications**: Provides detailed color data including Light Reflectance Value (LRV), CMYK, RGB, and NCS component breakdowns (Blackness, Chromaticness, Hue).
 *   **Comparison Tool**: Split-screen view to compare scanned colors against standard references or previous history.
@@ -18,7 +19,7 @@ A Progressive Web App (PWA) that uses Artificial Intelligence to analyze product
 *   React 19
 *   TypeScript
 *   Tailwind CSS
-*   Google GenAI SDK (Gemini 3 Flash)
+*   Google GenAI SDK (Gemini 2.5 Pro with Google Search grounding)
 *   Supabase (Auth, Database, Storage)
 *   Lucide React
 
