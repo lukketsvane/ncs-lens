@@ -57,7 +57,7 @@ export async function uploadAvatar(
   file: File | string,
   userId: string
 ): Promise<string> {
-  const fileName = `avatars/${userId}.jpg`;
+  const fileName = `${userId}/avatar.jpg`;
   
   let fileData: Blob;
   
