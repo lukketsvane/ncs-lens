@@ -323,7 +323,14 @@ const hexToNcsApprox = (hex: string): NCSColor => {
     }
   }
   
-  // Convert CSS hue to NCS hue (inverse mapping of ncsToCss)
+  // Convert CSS hue (0-360) to NCS hue (0-360).
+  // CSS HSL uses: 0=Red, 60=Yellow, 120=Green, 180=Cyan, 240=Blue, 300=Magenta
+  // NCS uses: 0=Yellow, 90=Red, 180=Blue, 270=Green
+  // The mapping transforms between these coordinate systems:
+  // - CSS 0-60 (Red to Yellow) maps to NCS 90-0 (Red to Yellow)
+  // - CSS 60-120 (Yellow to Green) maps to NCS 360-270 (Yellow to Green via full circle)
+  // - CSS 120-240 (Green to Blue) maps to NCS 270-180 (Green to Blue)
+  // - CSS 240-360 (Blue to Red) maps to NCS 180-90 (Blue to Red)
   let ncsHue = 0;
   if (h <= 60) {
     ncsHue = (60 - h) / 60 * 90;
@@ -1062,37 +1069,47 @@ const ResultView = ({
               <HueRing 
                 hue={wheelColor.hue} 
                 onChange={(newHue) => {
-                  setWheelColor(prev => ({ ...prev, hue: newHue }));
-                  // Update the edited color with new NCS code
-                  const newNcsHue = degreesToNcsHue(newHue);
-                  const sStr = Math.round(wheelColor.blackness).toString().padStart(2, '0');
-                  const cStr = Math.round(wheelColor.chromaticness).toString().padStart(2, '0');
-                  const newCode = `S ${sStr}${cStr}-${newNcsHue}`;
-                  setEditedColor(prev => prev ? { 
-                    ...prev, 
-                    code: newCode,
-                    hue: newNcsHue,
-                    system: 'NCS' as const
-                  } : null);
+                  // Use functional update to access current state values
+                  setWheelColor(prev => {
+                    const newNcsHue = degreesToNcsHue(newHue);
+                    const sStr = Math.round(prev.blackness).toString().padStart(2, '0');
+                    const cStr = Math.round(prev.chromaticness).toString().padStart(2, '0');
+                    const newCode = `S ${sStr}${cStr}-${newNcsHue}`;
+                    
+                    // Update edited color with new NCS code
+                    setEditedColor(prevColor => prevColor ? { 
+                      ...prevColor, 
+                      code: newCode,
+                      hue: newNcsHue,
+                      system: 'NCS' as const
+                    } : null);
+                    
+                    return { ...prev, hue: newHue };
+                  });
                 }} 
                 size={280} 
               />
               <TrianglePicker 
                 color={wheelColor} 
                 onChange={(s, c) => {
-                  setWheelColor(prev => ({ ...prev, blackness: s, chromaticness: c }));
-                  // Update the edited color with new NCS code
-                  const ncsHue = degreesToNcsHue(wheelColor.hue);
-                  const sStr = Math.round(s).toString().padStart(2, '0');
-                  const cStr = Math.round(c).toString().padStart(2, '0');
-                  const newCode = `S ${sStr}${cStr}-${ncsHue}`;
-                  setEditedColor(prev => prev ? { 
-                    ...prev, 
-                    code: newCode,
-                    blackness: sStr,
-                    chromaticness: cStr,
-                    system: 'NCS' as const
-                  } : null);
+                  // Use functional update to access current state values
+                  setWheelColor(prev => {
+                    const ncsHue = degreesToNcsHue(prev.hue);
+                    const sStr = Math.round(s).toString().padStart(2, '0');
+                    const cStr = Math.round(c).toString().padStart(2, '0');
+                    const newCode = `S ${sStr}${cStr}-${ncsHue}`;
+                    
+                    // Update edited color with new NCS code
+                    setEditedColor(prevColor => prevColor ? { 
+                      ...prevColor, 
+                      code: newCode,
+                      blackness: sStr,
+                      chromaticness: cStr,
+                      system: 'NCS' as const
+                    } : null);
+                    
+                    return { ...prev, blackness: s, chromaticness: c };
+                  });
                 }} 
                 size={220} 
               />
