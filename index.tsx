@@ -43,6 +43,7 @@ import {
 import { AuthProvider, useAuth } from "./components/AuthContext";
 import { AuthPage } from "./components/AuthPage";
 import { ProfilePage } from "./components/ProfilePage";
+import { VilkaarPage } from "./components/VilkaarPage";
 import { getUserScans, getPublicScans, createScan, updateScan, deleteScan, publishScan, unpublishScan, likeScan, unlikeScan, getLikesInfo, ScanRecord } from "./lib/scans";
 import { uploadImage, deleteImage } from "./lib/storage";
 import { HueRing, TrianglePicker, NCSColor, degreesToNcsHue, ncsToCss } from "./ncs-wheel";
@@ -1583,13 +1584,25 @@ const App = () => {
   const [detailItem, setDetailItem] = useState<HistoryItem | null>(null);
   const [detailColor, setDetailColor] = useState<ColorMatch | null>(null);
   const [salientMode, setSalientMode] = useState(false); // Salient mode: uses gemini-3-pro-preview with web search
+  const [showVilkaar, setShowVilkaar] = useState(false); // Show vilkaar (terms) page
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle URL routing for colors on mount
+  // Handle URL routing for colors and pages on mount
   useEffect(() => {
     const handlePopState = () => {
-      const colorInfo = parseColorUrl(window.location.pathname);
+      const path = window.location.pathname;
+      
+      // Handle /vilkaar route
+      if (path === '/vilkaar') {
+        setShowVilkaar(true);
+        setDetailColor(null);
+        return;
+      } else {
+        setShowVilkaar(false);
+      }
+      
+      const colorInfo = parseColorUrl(path);
       if (colorInfo) {
         // Create a basic ColorMatch from URL - will be enriched when NCS database is available
         const basicColor: ColorMatch = {
@@ -2189,7 +2202,10 @@ const App = () => {
         )}
 
         {activeTab === 'profile' && (
-          user ? <ProfilePage /> : <AuthPage />
+          user ? <ProfilePage onNavigateToVilkaar={() => {
+            setShowVilkaar(true);
+            updateUrl('/vilkaar');
+          }} /> : <AuthPage />
         )}
       </main>
 
@@ -2221,6 +2237,18 @@ const App = () => {
           isSaved={isColorSaved(detailColor)}
           onSelectColor={(color) => setDetailColor(color)}
         />
+      )}
+
+      {/* Vilkaar (Terms) Page */}
+      {showVilkaar && (
+        <div className="fixed inset-0 z-50 bg-white">
+          <VilkaarPage 
+            onBack={() => {
+              setShowVilkaar(false);
+              updateUrl('/');
+            }}
+          />
+        </div>
       )}
 
       {/* --- Bottom Navigation --- */}
