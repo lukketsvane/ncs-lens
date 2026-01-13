@@ -11,7 +11,11 @@ interface Profile {
   updated_at: string | null;
 }
 
-export function ProfilePage() {
+interface ProfilePageProps {
+  onNavigateToVilkaar?: () => void;
+}
+
+export function ProfilePage({ onNavigateToVilkaar }: ProfilePageProps = {}) {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [displayName, setDisplayName] = useState('');
@@ -223,8 +227,15 @@ export function ProfilePage() {
 
         {/* Actions */}
         <div className="bg-white rounded-[24px] shadow-sm border border-white overflow-hidden">
-          <a
-            href="/vilkaar"
+          <button
+            onClick={() => {
+              if (onNavigateToVilkaar) {
+                onNavigateToVilkaar();
+              } else {
+                window.history.pushState({}, '', '/vilkaar');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }
+            }}
             className="w-full px-6 py-4 flex items-center justify-between text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
           >
             <div className="flex items-center gap-3">
@@ -232,7 +243,7 @@ export function ProfilePage() {
               <span className="font-medium">Vilkår</span>
             </div>
             <ChevronRight size={18} className="text-gray-400" />
-          </a>
+          </button>
           <button
             onClick={handleSignOut}
             className="w-full px-6 py-4 flex items-center justify-between text-red-600 hover:bg-red-50 transition-colors"

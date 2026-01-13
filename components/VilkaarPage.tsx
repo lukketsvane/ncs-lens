@@ -130,7 +130,14 @@ export function VilkaarPage({ onBack }: VilkaarPageProps) {
 
           <h2 className="text-lg font-bold text-gray-900 mt-8 mb-4">Personvern</h2>
           <p className="text-gray-700 mb-4">
-            Sjå vår <a href="/personvern" className="text-blue-600 hover:underline">personvernerklæring</a> for informasjon om korleis vi handsamar personopplysningar.
+            Sjå vår <button 
+              onClick={(e) => {
+                e.preventDefault();
+                window.history.pushState({}, '', '/personvern');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="text-blue-600 hover:underline"
+            >personvernerklæring</button> for informasjon om korleis vi handsamar personopplysningar.
           </p>
 
           <h2 className="text-lg font-bold text-gray-900 mt-8 mb-4">Endringar i vilkåra</h2>

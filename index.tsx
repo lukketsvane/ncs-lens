@@ -2202,7 +2202,10 @@ const App = () => {
         )}
 
         {activeTab === 'profile' && (
-          user ? <ProfilePage /> : <AuthPage />
+          user ? <ProfilePage onNavigateToVilkaar={() => {
+            setShowVilkaar(true);
+            updateUrl('/vilkaar');
+          }} /> : <AuthPage />
         )}
       </main>
 
