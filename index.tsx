@@ -1259,6 +1259,59 @@ const ResultView = ({
   );
 };
 
+// Example palette data for empty state
+const EXAMPLE_PALETTE_ITEMS: HistoryItem[] = [
+  {
+    id: 'example-1',
+    timestamp: Date.now(),
+    image: '/IMG_7739.webp',
+    result: {
+      productType: 'Scandinavian Interior',
+      materials: [{ name: 'Wood', texture: 'Smooth', finish: 'Matte' }],
+      colors: [
+        { system: 'NCS', code: 'S 0502-Y', name: 'Off White', hex: '#F5F3EF', location: 'Wall', confidence: 'High', materialGuess: 'Paint', finishGuess: 'Matte', laymanDescription: 'Warm white' },
+        { system: 'NCS', code: 'S 2005-Y20R', name: 'Warm Beige', hex: '#D4CAB8', location: 'Floor', confidence: 'High', materialGuess: 'Oak', finishGuess: 'Natural', laymanDescription: 'Light oak' },
+        { system: 'NCS', code: 'S 6010-G10Y', name: 'Forest Green', hex: '#5A6B5C', location: 'Accent', confidence: 'High', materialGuess: 'Fabric', finishGuess: 'Velvet', laymanDescription: 'Sage green' },
+        { system: 'NCS', code: 'S 8502-Y', name: 'Charcoal', hex: '#3A3835', location: 'Frame', confidence: 'High', materialGuess: 'Metal', finishGuess: 'Powder coat', laymanDescription: 'Dark grey' },
+      ],
+    },
+    author: 'NCS Lens',
+    isPublic: true,
+  },
+  {
+    id: 'example-2',
+    timestamp: Date.now() - 1000,
+    image: '/IMG_7742.webp',
+    result: {
+      productType: 'Modern Kitchen',
+      materials: [{ name: 'Stone', texture: 'Polished', finish: 'Gloss' }],
+      colors: [
+        { system: 'NCS', code: 'S 0500-N', name: 'Pure White', hex: '#FFFFFF', location: 'Cabinet', confidence: 'High', materialGuess: 'Lacquer', finishGuess: 'High Gloss', laymanDescription: 'Bright white' },
+        { system: 'NCS', code: 'S 2502-Y', name: 'Light Grey', hex: '#C8C5C1', location: 'Counter', confidence: 'High', materialGuess: 'Quartz', finishGuess: 'Polished', laymanDescription: 'Soft grey' },
+        { system: 'NCS', code: 'S 7502-Y', name: 'Dark Grey', hex: '#4A4845', location: 'Island', confidence: 'High', materialGuess: 'Marble', finishGuess: 'Honed', laymanDescription: 'Graphite' },
+      ],
+    },
+    author: 'NCS Lens',
+    isPublic: true,
+  },
+  {
+    id: 'example-3',
+    timestamp: Date.now() - 2000,
+    image: '/IMG_1226.jpeg',
+    result: {
+      productType: 'Outdoor Furniture',
+      materials: [{ name: 'Teak', texture: 'Natural grain', finish: 'Oiled' }],
+      colors: [
+        { system: 'NCS', code: 'S 4030-Y30R', name: 'Teak Brown', hex: '#9B7A5B', location: 'Frame', confidence: 'High', materialGuess: 'Teak wood', finishGuess: 'Oiled', laymanDescription: 'Warm brown' },
+        { system: 'NCS', code: 'S 1005-Y20R', name: 'Cream', hex: '#EDE8DF', location: 'Cushion', confidence: 'High', materialGuess: 'Fabric', finishGuess: 'Textured', laymanDescription: 'Natural cream' },
+        { system: 'NCS', code: 'S 3010-G10Y', name: 'Olive', hex: '#8B9A7E', location: 'Accent', confidence: 'High', materialGuess: 'Cotton', finishGuess: 'Woven', laymanDescription: 'Muted olive' },
+      ],
+    },
+    author: 'NCS Lens',
+    isPublic: true,
+  },
+];
+
 // 3. Grid Views (History & Community)
 const GridView = ({ 
   items, 
@@ -1289,9 +1342,12 @@ const GridView = ({
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [paletteView, setPaletteView] = useState(false); // false = card view with image, true = palette only
 
+  // Use example data when items are empty (for Discover view)
+  const displayItems = items.length === 0 && title === 'Discover' ? EXAMPLE_PALETTE_ITEMS : items;
+
   // Filter and sort items
   const filteredAndSortedItems = React.useMemo(() => {
-    let result = items;
+    let result = displayItems;
     
     // Apply search filter
     if (searchQuery.trim()) {
@@ -1345,7 +1401,7 @@ const GridView = ({
     }
     
     return result;
-  }, [items, searchQuery, sortBy, enableSort]);
+  }, [displayItems, searchQuery, sortBy, enableSort]);
 
   const sortOptions: { value: SortOption; label: string; icon: React.ReactNode }[] = [
     { value: 'trending', label: 'Trending This Week', icon: <Flame size={16} /> },
@@ -1456,7 +1512,7 @@ const GridView = ({
              <div 
                key={item.id} 
                onClick={() => onSelect(item)} 
-               className="bg-white rounded-2xl shadow-sm border border-white overflow-hidden cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
+               className="bg-white rounded-2xl border border-gray-100 overflow-hidden cursor-pointer active:scale-[0.98] transition-all"
              >
                {/* Color strips */}
                <div className="flex h-20">
