@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Mail, LogOut, Loader2, CheckCircle2, Camera, ChevronRight } from 'lucide-react';
+import { User, Mail, LogOut, Loader2, CheckCircle2, Camera, ChevronRight, FileText } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
 import { uploadAvatar } from '../lib/storage';
@@ -223,6 +223,16 @@ export function ProfilePage() {
 
         {/* Actions */}
         <div className="bg-white rounded-[24px] shadow-sm border border-white overflow-hidden">
+          <a
+            href="/vilkaar"
+            className="w-full px-6 py-4 flex items-center justify-between text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
+          >
+            <div className="flex items-center gap-3">
+              <FileText size={18} />
+              <span className="font-medium">Vilkår</span>
+            </div>
+            <ChevronRight size={18} className="text-gray-400" />
+          </a>
           <button
             onClick={handleSignOut}
             className="w-full px-6 py-4 flex items-center justify-between text-red-600 hover:bg-red-50 transition-colors"
