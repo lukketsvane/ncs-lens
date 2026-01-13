@@ -44,6 +44,7 @@ import { AuthProvider, useAuth } from "./components/AuthContext";
 import { AuthPage } from "./components/AuthPage";
 import { ProfilePage } from "./components/ProfilePage";
 import { VilkaarPage } from "./components/VilkaarPage";
+import { PaletteExtractorPage } from "./components/PaletteExtractorPage";
 import { getUserScans, getPublicScans, createScan, updateScan, deleteScan, publishScan, unpublishScan, likeScan, unlikeScan, getLikesInfo, ScanRecord } from "./lib/scans";
 import { uploadImage, deleteImage } from "./lib/storage";
 import { HueRing, TrianglePicker, NCSColor, degreesToNcsHue, ncsToCss } from "./ncs-wheel";
@@ -139,7 +140,7 @@ interface HistoryItem {
   isLiked?: boolean; // Whether current user has liked this
 }
 
-type Tab = 'scan' | 'history' | 'community' | 'profile';
+type Tab = 'scan' | 'palette' | 'history' | 'community' | 'profile';
 
 // Sort options for community view
 type SortOption = 'trending' | 'newest' | 'most_liked';
@@ -2061,6 +2062,10 @@ const App = () => {
           </div>
         )}
 
+        {activeTab === 'palette' && (
+          <PaletteExtractorPage />
+        )}
+
         {activeTab === 'history' && (
           <div className="min-h-full pb-24 safe-area-top">
             {/* Sub-tabs */}
@@ -2260,6 +2265,14 @@ const App = () => {
           >
             <Camera strokeWidth={activeTab === 'scan' ? 2.5 : 2} size={24} />
             <span className="text-[10px] font-medium">Scan</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('palette')}
+            className={`flex flex-col items-center gap-1 p-2 transition-colors ${activeTab === 'palette' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            <Palette strokeWidth={activeTab === 'palette' ? 2.5 : 2} size={24} />
+            <span className="text-[10px] font-medium">Palette</span>
           </button>
           
           <button 
