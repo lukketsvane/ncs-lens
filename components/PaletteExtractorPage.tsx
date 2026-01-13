@@ -358,7 +358,7 @@ export const PaletteExtractorPage: React.FC = () => {
                       <span className="text-xs text-slate-400 font-medium">{uniquePantoneColors.length} Colors</span>
                   </div>
                   
-                  <div className="flex overflow-x-auto pb-8 pt-2 px-6 hide-scrollbar">
+                  <div className="flex overflow-x-auto pb-8 pt-2 px-6 no-scrollbar">
                         {uniquePantoneColors.map((color, i) => (
                            <PantoneChip 
                              key={i} 
