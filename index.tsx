@@ -1263,7 +1263,7 @@ const ResultView = ({
 const EXAMPLE_PALETTE_ITEMS: HistoryItem[] = [
   {
     id: 'example-1',
-    timestamp: Date.now(),
+    timestamp: 1704067200000, // Fixed timestamp: Jan 1, 2024
     image: '/IMG_7739.webp',
     result: {
       productType: 'Scandinavian Interior',
@@ -1280,7 +1280,7 @@ const EXAMPLE_PALETTE_ITEMS: HistoryItem[] = [
   },
   {
     id: 'example-2',
-    timestamp: Date.now() - 1000,
+    timestamp: 1704067199000, // Fixed timestamp: Jan 1, 2024 - 1 second
     image: '/IMG_7742.webp',
     result: {
       productType: 'Modern Kitchen',
@@ -1296,7 +1296,7 @@ const EXAMPLE_PALETTE_ITEMS: HistoryItem[] = [
   },
   {
     id: 'example-3',
-    timestamp: Date.now() - 2000,
+    timestamp: 1704067198000, // Fixed timestamp: Jan 1, 2024 - 2 seconds
     image: '/IMG_1226.jpeg',
     result: {
       productType: 'Outdoor Furniture',
