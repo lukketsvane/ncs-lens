@@ -2241,7 +2241,7 @@ const App = () => {
 
       {/* Vilkaar (Terms) Page */}
       {showVilkaar && (
-        <div className="fixed inset-0 z-50 bg-white">
+        <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
           <VilkaarPage 
             onBack={() => {
               setShowVilkaar(false);
