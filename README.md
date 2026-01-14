@@ -1,4 +1,4 @@
-# ncs Lens svelte
+# ncs svelte
 
 A Progressive Web App (PWA) that uses Artificial Intelligence to analyze product images, identifying materials and matching colors to professional standards like NCS and RAL.
 
