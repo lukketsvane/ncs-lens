@@ -266,7 +266,7 @@
   >
     <!-- Top Section -->
     <div 
-      class="relative pt-safe-top pb-8 px-6 transition-all duration-500 shadow-sm z-10 flex flex-col"
+      class="relative pt-safe-top pb-8 px-6 transition-all duration-500 z-10 flex flex-col"
       style="background-color: {displayHex}; height: {activeTab === 'compare' && compareColor ? '50%' : 'auto'}; min-height: {activeTab === 'compare' && compareColor ? '0' : '35%'}"
     >
       <div class="flex justify-between items-center mb-6">
@@ -391,7 +391,7 @@
           <div class="space-y-4">
             <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Material Identification</h3>
             <div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex items-start gap-4">
-              <div class="bg-white p-3 rounded-full shadow-sm">
+              <div class="bg-white p-3 rounded-full">
                 <Hammer class="text-gray-700" size={24} />
               </div>
               <div>
@@ -423,7 +423,7 @@
                 <p class="text-sm font-medium opacity-70 uppercase tracking-widest">{compareColor.name}</p>
               </div>
               
-              <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-white text-black font-bold text-xs px-3 py-1 rounded-full shadow-lg border border-gray-100 z-30">
+              <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-white text-black font-bold text-xs px-3 py-1 rounded-full border border-gray-100 z-30">
                 VS
               </div>
             </div>
@@ -437,7 +437,7 @@
                       onclick={() => compareColor = c}
                       class="flex-shrink-0 flex flex-col items-center gap-2 group"
                     >
-                      <div class="w-16 h-16 rounded-full border border-gray-200 shadow-sm group-hover:scale-105 transition-transform" style="background-color: {c.hex}"></div>
+                      <div class="w-16 h-16 rounded-full border border-gray-200 group-hover:scale-105 transition-transform" style="background-color: {c.hex}"></div>
                       <span class="text-xs font-medium text-gray-600 max-w-[80px] truncate">{c.name}</span>
                     </button>
                   {/each}
@@ -455,7 +455,7 @@
                         onclick={() => compareColor = c}
                         class="flex flex-col items-center gap-2 group"
                       >
-                        <div class="w-full aspect-square rounded-2xl border border-gray-200 shadow-sm group-hover:scale-105 transition-transform" style="background-color: {c.hex}"></div>
+                        <div class="w-full aspect-square rounded-2xl border border-gray-200 group-hover:scale-105 transition-transform" style="background-color: {c.hex}"></div>
                         <span class="text-[10px] font-medium text-gray-600 w-full truncate text-center">{c.code.split(" ").pop()}</span>
                       </button>
                     {/each}
@@ -500,7 +500,7 @@
       <div class="p-4 border-t border-gray-100 bg-white safe-area-bottom">
         <button 
           onclick={() => showSimilarColors = true}
-          class="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2"
+          class="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl hover:bg-black transition-all flex items-center justify-center gap-2"
         >
           <Palette size={18} />
           <span>Find Similar Colors ({similarColors.length})</span>
@@ -524,7 +524,7 @@
 
         <div class="p-4 border-b border-gray-100">
           <div class="flex items-center gap-3">
-            <div class="w-12 h-12 rounded-xl shadow-sm border border-gray-200" style="background-color: {$detailColor.hex}"></div>
+            <div class="w-12 h-12 rounded-xl border border-gray-200" style="background-color: {$detailColor.hex}"></div>
             <div>
               <p class="font-semibold text-gray-900">{$detailColor.code}</p>
               <p class="text-sm text-gray-500">{$detailColor.name}</p>
@@ -545,7 +545,7 @@
                 onclick={() => selectSimilarColor(item.color)}
                 class="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors cursor-pointer active:scale-[0.98] w-full text-left"
               >
-                <div class="w-14 h-14 rounded-xl shadow-sm border border-gray-200 flex-shrink-0" style="background-color: {item.color.hex}"></div>
+                <div class="w-14 h-14 rounded-xl border border-gray-200 flex-shrink-0" style="background-color: {item.color.hex}"></div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <p class="font-semibold text-gray-900">{item.color.code}</p>

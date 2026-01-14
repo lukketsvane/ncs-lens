@@ -170,16 +170,13 @@
   <div class="min-h-screen bg-[#F0F2F5] flex flex-col items-center justify-center p-4 safe-area-top safe-area-bottom">
     <div class="w-full max-w-sm">
       <div class="text-center mb-8">
-        <div class="flex items-center justify-center gap-2 mb-2">
-          <span class="w-2 h-6 bg-black rounded-full block"></span>
-          <h1 class="text-2xl font-bold tracking-tight">NCS Scanner</h1>
-        </div>
+        <h1 class="text-2xl font-bold tracking-tight mb-2">NCS Lens</h1>
         <p class="text-gray-500 text-sm">
           {isSignUp ? 'Create your account' : 'Welcome back'}
         </p>
       </div>
 
-      <div class="bg-white rounded-[32px] p-8 shadow-sm border border-white">
+      <div class="bg-white rounded-[32px] p-8 border border-white">
         <form onsubmit={handleAuthSubmit} class="space-y-4">
           <div class="relative">
             <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
@@ -232,7 +229,7 @@
           <button
             type="submit"
             disabled={authLoading}
-            class="w-full bg-gray-900 text-white font-semibold py-4 rounded-2xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full bg-gray-900 text-white font-semibold py-4 rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {#if authLoading}
               <Loader2 size={20} class="animate-spin" />
@@ -271,7 +268,7 @@
 
       <div class="max-w-md mx-auto space-y-4">
         <!-- Profile Header -->
-        <div class="bg-white rounded-[24px] p-6 shadow-sm border border-white">
+        <div class="bg-white rounded-[24px] p-6 border border-white">
           <div class="flex items-center gap-4">
             <div class="relative">
               <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
@@ -290,7 +287,7 @@
               <button 
                 onclick={() => avatarInput.click()}
                 disabled={uploadingAvatar}
-                class="absolute bottom-0 right-0 p-1.5 bg-gray-900 text-white rounded-full shadow-sm hover:bg-black transition-colors disabled:opacity-50"
+                class="absolute bottom-0 right-0 p-1.5 bg-gray-900 text-white rounded-full hover:bg-black transition-colors disabled:opacity-50"
               >
                 <Camera size={12} />
               </button>
@@ -312,7 +309,7 @@
         </div>
 
         <!-- Profile Settings -->
-        <div class="bg-white rounded-[24px] p-6 shadow-sm border border-white space-y-4">
+        <div class="bg-white rounded-[24px] p-6 border border-white space-y-4">
           <h3 class="font-semibold text-gray-900 mb-4">Account Settings</h3>
 
           <div class="space-y-2">
@@ -336,7 +333,7 @@
           <button
             onclick={updateProfile}
             disabled={saving}
-            class="w-full bg-gray-900 text-white font-semibold py-3 rounded-xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            class="w-full bg-gray-900 text-white font-semibold py-3 rounded-xl hover:bg-black transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {#if saving}
               <Loader2 size={18} class="animate-spin" />
@@ -350,7 +347,7 @@
         </div>
 
         <!-- Actions -->
-        <div class="bg-white rounded-[24px] shadow-sm border border-white overflow-hidden">
+        <div class="bg-white rounded-[24px] border border-white overflow-hidden">
           <button
             onclick={() => showVilkaar.set(true)}
             class="w-full px-6 py-4 flex items-center justify-between text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
