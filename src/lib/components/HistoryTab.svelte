@@ -86,7 +86,7 @@
           {#each $history as item (item.id)}
             <div 
               onclick={() => selectItem(item)} 
-              class="bg-white p-3 rounded-2xl shadow-sm border border-white flex flex-col gap-3 cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
+              class="bg-white p-3 rounded-2xl border border-white flex flex-col gap-3 cursor-pointer active:scale-[0.98] transition-all"
               role="button"
               tabindex="0"
             >
@@ -131,12 +131,12 @@
           {#each $savedColors as color (color.id)}
             <div 
               onclick={() => selectColor(savedColorToMatch(color))}
-              class="bg-white p-3 rounded-2xl shadow-sm border border-white flex flex-col gap-2 cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
+              class="bg-white p-3 rounded-2xl border border-white flex flex-col gap-2 cursor-pointer active:scale-[0.98] transition-all"
               role="button"
               tabindex="0"
             >
               <div 
-                class="aspect-square rounded-xl shadow-sm border border-gray-100" 
+                class="aspect-square rounded-xl border border-gray-100" 
                 style="background-color: {color.color_hex}"
               ></div>
               <div class="min-w-0 text-center">

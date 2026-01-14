@@ -54,14 +54,11 @@
 
 <div class="min-h-full pb-24 safe-area-top">
   <div class="p-4 flex flex-col min-h-[calc(100vh-6rem)]">
-    <div class="flex items-center gap-2 mb-8 mt-2">
-      <span class="w-2 h-6 bg-black rounded-full block"></span>
-      <h1 class="text-xl font-bold tracking-tight">NCS Lens</h1>
-    </div>
+    <h1 class="text-2xl font-bold tracking-tight mb-8 mt-2 px-1">NCS Lens</h1>
   
     <div class="flex-1 flex flex-col justify-center items-center pb-12">
       {#if $loading}
-        <div class="group relative bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] shadow-[0_20px_40px_rgba(0,0,0,0.05)] border border-white flex flex-col items-center justify-center gap-6 overflow-hidden">
+        <div class="group relative bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] border border-white flex flex-col items-center justify-center gap-6 overflow-hidden">
           <div class="absolute inset-0 bg-gradient-to-tr from-gray-50 via-white to-gray-50 opacity-50"></div>
           <div class="relative z-10">
             <Loader2 size={48} class="animate-spin text-black" />
@@ -72,7 +69,7 @@
           </div>
         </div>
       {:else if !$user}
-        <div class="group relative bg-gray-100 rounded-[40px] w-full max-w-[320px] aspect-[3/4] shadow-[0_10px_30px_rgba(0,0,0,0.03)] border border-gray-200 flex flex-col items-center justify-center gap-6 overflow-hidden">
+        <div class="group relative bg-gray-100 rounded-[40px] w-full max-w-[320px] aspect-[3/4] border border-gray-200 flex flex-col items-center justify-center gap-6 overflow-hidden">
           <div class="absolute inset-0 bg-gradient-to-tr from-gray-100 via-gray-50 to-gray-100 opacity-60"></div>
           <div class="relative z-10 w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
             <Sparkles size={32} class="text-gray-300" />
@@ -82,7 +79,7 @@
             <p class="text-sm text-gray-400 leading-relaxed">Create an account or sign in to start scanning materials and colors.</p>
             <button
               onclick={() => activeTab.set('profile')}
-              class="mt-4 bg-gray-900 text-white font-semibold py-3 px-6 rounded-2xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2 mx-auto"
+              class="mt-4 bg-gray-900 text-white font-semibold py-3 px-6 rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-2 mx-auto"
             >
               <User size={18} />
               <span>Sign In / Sign Up</span>
@@ -92,7 +89,7 @@
       {:else}
         <button 
           onclick={() => fileInput.click()}
-          class="group relative cursor-pointer bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] shadow-[0_20px_40px_rgba(0,0,0,0.05)] border border-white flex flex-col items-center justify-center gap-8 overflow-hidden transition-all active:scale-[0.98] hover:shadow-[0_25px_50px_rgba(0,0,0,0.08)]"
+          class="group relative cursor-pointer bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] border border-white flex flex-col items-center justify-center gap-8 overflow-hidden transition-all active:scale-[0.98]"
         >
           <div class="absolute inset-0 bg-gradient-to-tr from-gray-50 via-white to-gray-50 opacity-50"></div>
           <div class="relative z-10 w-24 h-24 bg-[#F5F5F7] rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
@@ -100,7 +97,7 @@
           </div>
           <div class="relative z-10 text-center space-y-3">
             <h2 class="text-2xl font-bold text-gray-900 tracking-tight">New Scan</h2>
-            <div class="flex items-center justify-center gap-3 text-gray-400 text-sm font-medium bg-white px-4 py-2 rounded-full shadow-sm">
+            <div class="flex items-center justify-center gap-3 text-gray-400 text-sm font-medium bg-white px-4 py-2 rounded-full">
               <Camera size={16} /> <span class="w-px h-3 bg-gray-200"></span> <ImageIcon size={16} />
             </div>
           </div>
@@ -117,7 +114,7 @@
           <Zap size={12} class={$salientMode ? 'text-amber-500' : 'text-gray-400'} />
           <span>Salient</span>
           <div class="w-6 h-3.5 rounded-full transition-colors {$salientMode ? 'bg-amber-400' : 'bg-gray-300'} relative">
-            <div class="absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow-sm transition-transform {$salientMode ? 'translate-x-3' : 'translate-x-0.5'}"></div>
+            <div class="absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-transform {$salientMode ? 'translate-x-3' : 'translate-x-0.5'}"></div>
           </div>
         </button>
       {/if}

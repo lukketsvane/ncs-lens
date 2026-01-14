@@ -130,7 +130,7 @@
   >
     <div class="p-4 min-h-full pb-20">
       <div class="flex justify-between items-center mb-6">
-        <button onclick={handleBack} class="p-2 bg-white rounded-full shadow-sm hover:bg-gray-100">
+        <button onclick={handleBack} class="p-2 bg-white rounded-full hover:bg-gray-100">
           <ChevronLeft size={20} />
         </button>
         
@@ -174,7 +174,7 @@
           <button 
             onclick={isPublic ? handleUnpublish : handlePublish}
             disabled={isPublishing || isUnpublishing}
-            class="p-2 rounded-full shadow-sm transition-all duration-300 {isPublic ? 'bg-green-100 text-green-700' : 'bg-white text-gray-500'}"
+            class="p-2 rounded-full transition-all duration-300 {isPublic ? 'bg-green-100 text-green-700' : 'bg-white text-gray-500'}"
             title={isPublic ? 'Public - click to make private' : 'Private - click to publish'}
           >
             {#if isPublishing || isUnpublishing}
@@ -191,12 +191,12 @@
       </div>
 
       <div class="max-w-md mx-auto space-y-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
-        <div class="relative rounded-[32px] overflow-hidden bg-gray-200 aspect-square shadow-sm group">
+        <div class="relative rounded-[32px] overflow-hidden bg-gray-200 aspect-square group">
           <img src={$detailItem.image} class="w-full h-full object-cover" alt="Product" />
           {#if isOwner}
             <button 
               onclick={handleRegenerate}
-              class="absolute bottom-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-semibold shadow-sm hover:bg-white transition-colors"
+              class="absolute bottom-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-semibold hover:bg-white transition-colors"
             >
               <RotateCcw size={14} class="text-gray-600" />
               <span class="text-gray-800">Re-analyze</span>
@@ -209,7 +209,7 @@
           {/if}
         </div>
 
-        <div class="bg-white rounded-[24px] p-5 shadow-sm border border-white/50">
+        <div class="bg-white rounded-[24px] p-5 border border-white/50">
           <div class="text-sm text-gray-400 font-medium mb-1">Materials</div>
           <div class="flex flex-wrap gap-2">
             {#each $detailItem.result.materials as material}
@@ -226,7 +226,7 @@
             {@const isFull = i === 0 && $detailItem.result.colors.length % 2 !== 0}
             
             <div 
-              class="relative group rounded-[24px] p-5 flex flex-col justify-between h-40 shadow-sm transition-transform {isFull ? 'col-span-2' : 'col-span-1'}"
+              class="relative group rounded-[24px] p-5 flex flex-col justify-between h-40 transition-transform {isFull ? 'col-span-2' : 'col-span-1'}"
               style="background-color: {color.hex}"
             >
               <div class="flex justify-between items-start {textColorClass} opacity-80">

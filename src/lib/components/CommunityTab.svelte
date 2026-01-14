@@ -139,7 +139,7 @@
             type="text"
             bind:value={searchQuery}
             placeholder="Search products, colors, materials..."
-            class="w-full pl-9 pr-4 py-2.5 bg-white rounded-xl text-sm font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 shadow-sm"
+            class="w-full pl-9 pr-4 py-2.5 bg-white rounded-xl text-sm font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10"
           />
         </div>
         <button 
@@ -154,7 +154,7 @@
       <div class="flex items-center gap-2">
         <button 
           onclick={() => paletteView = !paletteView}
-          class="p-2 rounded-full shadow-sm transition-colors {paletteView ? 'bg-gray-900 text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}"
+          class="p-2 rounded-full transition-colors {paletteView ? 'bg-gray-900 text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}"
           title={paletteView ? 'Show cards with images' : 'Show palette only'}
         >
           {#if paletteView}
@@ -165,7 +165,7 @@
         </button>
         <button 
           onclick={() => showSearch = true}
-          class="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors"
+          class="p-2 bg-white rounded-full hover:bg-gray-50 transition-colors"
         >
           <Search size={20} class="text-gray-400" />
         </button>
@@ -177,7 +177,7 @@
     <div class="mb-4 px-1 relative">
       <button
         onclick={() => showSortMenu = !showSortMenu}
-        class="flex items-center gap-2 px-3 py-2 bg-white rounded-xl shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        class="flex items-center gap-2 px-3 py-2 bg-white rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
       >
         {#if sortBy === 'trending'}
           <Flame size={16} />
@@ -191,7 +191,7 @@
       </button>
       
       {#if showSortMenu}
-        <div class="absolute top-full left-1 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20 min-w-[180px]">
+        <div class="absolute top-full left-1 mt-1 bg-white rounded-xl border border-gray-100 py-1 z-20 min-w-[180px]">
           {#each sortOptions as option}
             <button
               onclick={() => { sortBy = option.value; showSortMenu = false; }}
@@ -267,7 +267,7 @@
       {#each filteredAndSortedItems as item (item.id)}
         <div 
           onclick={() => selectItem(item)} 
-          class="bg-white p-3 rounded-2xl shadow-sm border border-white flex flex-col gap-3 cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
+          class="bg-white p-3 rounded-2xl border border-white flex flex-col gap-3 cursor-pointer active:scale-[0.98] transition-all"
           role="button"
           tabindex="0"
         >

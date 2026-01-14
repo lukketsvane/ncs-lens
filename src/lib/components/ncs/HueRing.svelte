@@ -115,13 +115,13 @@
         class="absolute left-1/2 top-0 origin-bottom"
         style="height: 50%; transform: translateX(-50%) rotate({m.deg}deg) translateY(4px)"
       >
-        <div class="w-1 h-3 rounded-full shadow-sm" style="background-color: {m.color}"></div>
+        <div class="w-1 h-3 rounded-full" style="background-color: {m.color}"></div>
       </div>
     {/each}
   </div>
   
   <div 
-    class="absolute rounded-full pointer-events-none shadow-[inset_0_0_15px_rgba(0,0,0,0.1)]"
+    class="absolute rounded-full pointer-events-none"
     style="width: {size - thickness * 2}px; height: {size - thickness * 2}px"
   ></div>
 </div>

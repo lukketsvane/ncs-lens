@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Upload, Image as ImageIcon, ChevronLeft, Heart, Share2, Copy, Check, Loader2 } from 'lucide-svelte';
+  import { onMount } from 'svelte';
   import { 
     analyzeImageForPalette, 
     getUniquePantoneColors, 
@@ -10,6 +11,8 @@
     type PaletteAnalysis
   } from '$lib/pantone-colors';
 
+  const PRELOAD_IMAGE_URL = '/lugubra.png';
+
   let analysis = $state<PaletteAnalysis | null>(null);
   let selectedColor = $state<ExtractedColor | null>(null);
   let isDragging = $state(false);
@@ -17,6 +20,35 @@
   let fileInput: HTMLInputElement;
   let lastTap = 0;
   let copied = $state<string | null>(null);
+
+  onMount(() => {
+    loadPreloadImage();
+  });
+
+  async function loadPreloadImage() {
+    loading = true;
+    try {
+      const response = await fetch(PRELOAD_IMAGE_URL);
+      if (!response.ok) {
+        loading = false;
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        processImage(img);
+        // Note: Don't revoke URL here as it's used for display in analysis.src
+      };
+      img.onerror = () => {
+        loading = false;
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    } catch {
+      loading = false;
+    }
+  }
 
   function processImage(img: HTMLImageElement) {
     loading = true;
@@ -102,19 +134,22 @@
 </script>
 
 <div 
-  class="min-h-full pb-24 safe-area-top flex items-start justify-center p-4 lg:p-8"
+  class="min-h-full pb-24 safe-area-top p-4 lg:p-8"
   ondragover={handleDragOver}
   ondragleave={handleDragLeave}
   ondrop={handleDrop}
 >
-  <div class="w-full max-w-[900px] flex flex-col gap-6">
+  <div class="w-full max-w-[900px] mx-auto flex flex-col gap-6">
+    
+    <!-- Page Title -->
+    <h1 class="text-2xl font-bold tracking-tight px-1">Palette</h1>
     
     <!-- Main Card -->
-    <div class="bg-white rounded-[2.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden ring-1 ring-slate-900/5 min-h-[600px] flex flex-col relative">
+    <div class="bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-slate-900/5 min-h-[600px] flex flex-col relative">
         
         {#if isDragging}
           <div class="absolute inset-0 bg-blue-500/10 z-50 flex items-center justify-center backdrop-blur-md pointer-events-none transition-all">
-            <div class="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 text-center">
+            <div class="bg-white/80 backdrop-blur-xl p-8 rounded-3xl border border-white/50 text-center">
               <Upload class="w-16 h-16 mb-4 mx-auto text-blue-500" />
               <p class="text-xl font-semibold text-slate-800">Drop to Analyze</p>
             </div>
@@ -133,7 +168,7 @@
                 <img 
                   src={analysis.src} 
                   alt="Analysis Target" 
-                  class="max-h-[400px] max-w-full object-contain shadow-2xl rounded-lg transform transition-transform hover:scale-[1.02] duration-500"
+                  class="max-h-[400px] max-w-full object-contain rounded-lg transform transition-transform hover:scale-[1.02] duration-500"
                 />
               </div>
             </div>
@@ -148,7 +183,7 @@
                   <div class="absolute top-0 left-0 w-20 h-20 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
                 </div>
               {:else}
-                <div class="w-32 h-32 bg-white rounded-[2rem] flex items-center justify-center shadow-lg ring-1 ring-slate-900/5">
+                <div class="w-32 h-32 bg-white rounded-[2rem] flex items-center justify-center ring-1 ring-slate-900/5">
                   <ImageIcon class="w-12 h-12 opacity-20 text-slate-900" />
                 </div>
                 <div class="text-center space-y-2">
@@ -170,7 +205,7 @@
 
         {#if analysis}
           <!-- Middle Section: Pantone Deck -->
-          <div class="relative w-full bg-white -mt-10 rounded-t-[2.5rem] pt-8 z-10 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+          <div class="relative w-full bg-white -mt-10 rounded-t-[2.5rem] pt-8 z-10">
             <div class="px-8 mb-4 flex justify-between items-end">
               <h3 class="text-sm font-bold text-slate-900">Extracted Palette</h3>
               <span class="text-xs text-slate-400 font-medium">{uniquePantoneColors.length} Colors</span>
@@ -180,7 +215,7 @@
               {#each uniquePantoneColors as color, i}
                 <button 
                   onclick={() => selectedColor = color}
-                  class="flex-shrink-0 w-28 h-40 bg-white shadow-sm rounded-xl overflow-hidden flex flex-col transition-all hover:scale-105 active:scale-95 mx-2 ring-1 ring-black/5 text-left group"
+                  class="flex-shrink-0 w-28 h-40 bg-white rounded-xl overflow-hidden flex flex-col transition-all hover:scale-105 active:scale-95 mx-2 ring-1 ring-black/5 text-left group"
                 >
                   <div class="h-24 w-full" style="background-color: {color.pantone.hex}"></div>
                   <div class="flex-1 p-3 flex flex-col justify-center bg-white">
@@ -223,12 +258,6 @@
 
     </div>
 
-    {#if !analysis}
-      <p class="text-center text-sm text-gray-400 max-w-[300px] mx-auto leading-relaxed">
-        Upload any image to extract a Pantone palette. No AI needed - runs locally in your browser.
-      </p>
-    {/if}
-
   </div>
 
   <!-- Detailed Color View Modal -->
@@ -240,7 +269,7 @@
     {@const subTextColorClass = getSubContrastClass(selectedColor)}
     
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-white sm:p-4">
-      <div class="w-full h-full max-w-md bg-white sm:rounded-[2rem] sm:h-[90vh] sm:shadow-2xl overflow-hidden flex flex-col relative ring-1 ring-black/5">
+      <div class="w-full h-full max-w-md bg-white sm:rounded-[2rem] sm:h-[90vh] overflow-hidden flex flex-col relative ring-1 ring-black/5">
         
         <!-- Header Color Block -->
         <div 
@@ -326,7 +355,7 @@
           </div>
 
           <div class="p-6 border-t border-slate-100 bg-white pb-8 sm:pb-6">
-            <button class="w-full bg-slate-900 text-white font-medium py-4 rounded-xl shadow-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
+            <button class="w-full bg-slate-900 text-white font-medium py-4 rounded-xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
               <span>Find Similar Colors</span>
               <span class="bg-white/20 px-1.5 py-0.5 rounded text-xs">10</span>
             </button>
