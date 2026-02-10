@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { ChevronLeft, RotateCcw, Globe, Lock, Loader2, RefreshCw, Pencil, Check, ArrowRight, Heart } from 'lucide-svelte';
+  import { ChevronLeft, RotateCcw, Globe, Lock, Loader2, RefreshCw, Pencil, Check, ArrowRight, Heart, GitCompare } from 'lucide-svelte';
   import { user } from '$lib/stores/auth';
-  import { detailItem, detailColor, history, communityItems, loading, salientMode, savedColorKeys, savedColors } from '$lib/stores/app';
+  import { detailItem, detailColor, history, communityItems, loading, salientMode, savedColorKeys, savedColors, compareTarget } from '$lib/stores/app';
   import { publishScan, unpublishScan, updateScan } from '$lib/scans';
   import { saveColor, unsaveColor } from '$lib/saved-colors';
   import { analyzeImage } from '$lib/api';
@@ -109,6 +109,12 @@
 
   function selectColor(color: ColorMatch) { detailColor.set(color); }
 
+  function compareWithColor(color: ColorMatch, otherColor: ColorMatch, e: MouseEvent) {
+    e.stopPropagation();
+    compareTarget.set(otherColor);
+    detailColor.set(color);
+  }
+
   async function toggleSaveColor(color: ColorMatch, e: MouseEvent) {
     e.stopPropagation();
     if (!$user) return;
@@ -148,6 +154,18 @@
       onCancel: () => { swipeReturning = true; swipeProgress = 0; }
     }}
   >
+    <!-- Swipe back indicator -->
+    {#if swipeProgress > 0}
+      <div
+        class="fixed left-0 top-1/2 -translate-y-1/2 z-50 pointer-events-none"
+        style="opacity: {Math.min(1, swipeProgress * 2)}; transform: translateX({swipeProgress * 20}px) translateY(-50%)"
+      >
+        <div class="bg-black/20 backdrop-blur-md rounded-r-full p-2 pl-1">
+          <ChevronLeft size={20} class="text-white" />
+        </div>
+      </div>
+    {/if}
+
     <div class="p-4 min-h-full pb-20">
       <div class="flex justify-between items-center mb-6">
         <button onclick={handleBack} class="p-2 bg-white rounded-full hover:bg-gray-100"><ChevronLeft size={20} /></button>
@@ -216,6 +234,12 @@
                   {#if $user}
                     <button onclick={(e) => toggleSaveColor(color, e)} class="p-1.5 rounded-full hover:bg-black/10 transition-colors">
                       <Heart size={14} fill={$savedColorKeys.has(`${color.system}:${color.code}`) ? 'currentColor' : 'none'} class={$savedColorKeys.has(`${color.system}:${color.code}`) ? 'text-red-500' : ''} />
+                    </button>
+                  {/if}
+                  {#if $detailItem.result.colors.length >= 2}
+                    {@const otherColor = $detailItem.result.colors.find((c, j) => j !== i) ?? $detailItem.result.colors[0]}
+                    <button onclick={(e) => compareWithColor(color, otherColor, e)} class="p-1.5 rounded-full hover:bg-black/10 transition-colors" title={$t('color.compare')}>
+                      <GitCompare size={14} />
                     </button>
                   {/if}
                   {#if isOwner}

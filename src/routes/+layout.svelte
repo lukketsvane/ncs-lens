@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { Camera, Palette, Layers, Globe, User } from 'lucide-svelte';
-  import { activeTab, detailItem, detailColor } from '$lib/stores/app';
+  import { activeTab, detailItem, detailColor, selectedPaletteColor } from '$lib/stores/app';
   import { initAuth } from '$lib/stores/auth';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
@@ -9,6 +9,7 @@
   import Toast from '$lib/components/Toast.svelte';
   import ResultView from '$lib/components/ResultView.svelte';
   import ColorDetailView from '$lib/components/ColorDetailView.svelte';
+  import PaletteColorModal from '$lib/components/PaletteColorModal.svelte';
 
   let { children } = $props();
 
@@ -28,6 +29,10 @@
   <!-- Global Overlays (accessible from all routes) -->
   {#if $detailItem}
     <ResultView />
+  {/if}
+
+  {#if $selectedPaletteColor}
+    <PaletteColorModal />
   {/if}
 
   {#if $detailColor}

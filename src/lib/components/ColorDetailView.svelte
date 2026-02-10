@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronLeft, Share2, Heart, Hammer, RotateCcw, Palette, XCircle, Check } from 'lucide-svelte';
+  import { ChevronLeft, Share2, Heart, Hammer, RotateCcw, Palette, XCircle, Check, Copy } from 'lucide-svelte';
   import { user } from '$lib/stores/auth';
   import { detailColor, history, communityItems, savedColorKeys, savedColors, compareTarget, MAX_SIMILAR_COLOR_DISTANCE } from '$lib/stores/app';
   import { saveColor, unsaveColor } from '$lib/saved-colors';
@@ -172,6 +172,18 @@
     }
   }
 
+  async function handleShare() {
+    if (!$detailColor) return;
+    const text = `${$detailColor.system} ${$detailColor.code} — ${$detailColor.name} (${$detailColor.hex})`;
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: `${$detailColor.system} ${$detailColor.code}`, text });
+      } catch {}
+    } else {
+      await navigator.clipboard.writeText(text);
+    }
+  }
+
   // Derived values
   const isNCS = $derived($detailColor?.system === 'NCS');
   const isWheelTabActive = $derived(activeTab === 'wheel');
@@ -291,6 +303,18 @@
       onCancel: () => { swipeReturning = true; swipeProgress = 0; }
     }}
   >
+    <!-- Swipe back indicator -->
+    {#if swipeProgress > 0}
+      <div
+        class="fixed left-0 top-1/2 -translate-y-1/2 z-[70] pointer-events-none"
+        style="opacity: {Math.min(1, swipeProgress * 2)}; transform: translateX({swipeProgress * 20}px) translateY(-50%)"
+      >
+        <div class="bg-black/20 backdrop-blur-md rounded-r-full p-2 pl-1">
+          <ChevronLeft size={20} class="text-white" />
+        </div>
+      </div>
+    {/if}
+
     <!-- Top Section -->
     <div
       class="relative pt-safe-top pb-8 px-6 transition-all duration-500 z-10 flex flex-col"
@@ -316,14 +340,14 @@
               <Heart size={20} fill={colorSaved ? 'currentColor' : 'none'} class={colorSaved ? 'text-red-500' : ''} />
             </button>
           {/if}
-          <button class="{contrastText} opacity-80 hover:opacity-100">
+          <button onclick={handleShare} class="{contrastText} opacity-80 hover:opacity-100">
             <Share2 size={20} />
           </button>
         </div>
       </div>
 
       <div class="flex flex-col items-center justify-center flex-1 {contrastText}">
-        {#if isNCS}
+        {#if isNCS || isWheelTabActive}
           <div class="w-full max-w-sm">
             {#if !compareColor || activeTab !== 'compare'}
               <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase opacity-60 mb-2 px-6">

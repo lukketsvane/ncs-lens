@@ -152,6 +152,12 @@ const no: Record<string, string> = {
   'color.middle_grey': 'Mellomgrå',
   'color.black': 'Svart',
 
+  // Share
+  'share.copied': 'Kopiert til utklippstavla',
+
+  // Palette modal
+  'palette.pantone_connect': 'Pantone Connect',
+
   // Error page
   'error.go_home': 'Gå heim',
   'error.something_wrong': 'Noko gjekk gale',

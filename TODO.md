@@ -1,12 +1,12 @@
 # TODO
 
-- [ ] Remove preload image in PaletteTab
-- [ ] Palette extraction points + canvas color picker
-- [ ] Fixing Fine Tune tab
-- [ ] Create save/compare utilities and compareTarget store
-- [ ] Make all ColorDetailView features functional
-- [ ] Improve iOS gestures with visual feedback
-- [ ] General layout cleanup + move overlays to layout
-- [ ] User profile viewing route
-- [ ] Add new i18n keys for all features
-- [ ] Build and verify
+- [x] Remove preload image in PaletteTab
+- [x] Palette extraction points + canvas color picker
+- [x] Fixing Fine Tune tab
+- [x] Create save/compare utilities and compareTarget store
+- [x] Make all ColorDetailView features functional
+- [x] Improve iOS gestures with visual feedback
+- [x] General layout cleanup + move overlays to layout
+- [x] User profile viewing route
+- [x] Add new i18n keys for all features
+- [x] Build and verify

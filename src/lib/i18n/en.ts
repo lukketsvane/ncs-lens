@@ -152,6 +152,12 @@ const en: Record<string, string> = {
   'color.middle_grey': 'Middle Grey',
   'color.black': 'Black',
 
+  // Share
+  'share.copied': 'Copied to clipboard',
+
+  // Palette modal
+  'palette.pantone_connect': 'Pantone Connect',
+
   // Error page
   'error.go_home': 'Go Home',
   'error.something_wrong': 'Something went wrong',

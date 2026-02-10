@@ -1,33 +1,24 @@
 <script lang="ts">
-  import { Upload, Image as ImageIcon, ChevronLeft, Heart, Share2, Copy, Check, Loader2, X, Crosshair, Pipette } from 'lucide-svelte';
+  import { Upload, Loader2, X, Crosshair, Pipette } from 'lucide-svelte';
   import { t } from '$lib/i18n';
-  import { user } from '$lib/stores/auth';
-  import { detailColor, savedColorKeys, savedColors } from '$lib/stores/app';
-  import { saveColor, unsaveColor } from '$lib/saved-colors';
+  import { selectedPaletteColor } from '$lib/stores/app';
   import {
     analyzeImageForPalette,
     getUniquePantoneColors,
-    hexToRgb,
-    calculateLRV,
-    calculateCMYK,
     findNearestPantone,
-    type ExtractedColor,
     type PaletteAnalysis
   } from '$lib/pantone-colors';
 
   let analysis = $state<PaletteAnalysis | null>(null);
-  let selectedColor = $state<ExtractedColor | null>(null);
   let isDragging = $state(false);
   let loading = $state(false);
   let fileInput: HTMLInputElement;
   let lastTap = 0;
-  let copied = $state<string | null>(null);
   let showExtractionPoints = $state(true);
   let pickerMode = $state(false);
   let pickedColor = $state<{ x: number; y: number; hex: string; pantone: { code: string; name: string; hex: string } } | null>(null);
   let imageCanvas = $state<HTMLCanvasElement | null>(null);
   let imageRef = $state<HTMLImageElement | null>(null);
-  let colorSaved = $state(false);
 
   function processImage(img: HTMLImageElement) {
     loading = true;
@@ -85,31 +76,6 @@
     };
   }
 
-  async function handleSaveSelectedColor() {
-    if (!$user || !selectedColor) return;
-    const key = `Pantone:${selectedColor.pantone.code}`;
-    if ($savedColorKeys.has(key)) {
-      const success = await unsaveColor($user.id, 'NCS' as any, selectedColor.pantone.code);
-      if (success) {
-        savedColors.update(colors => colors.filter(c => !(c.color_code === selectedColor!.pantone.code)));
-        savedColorKeys.update(keys => { const next = new Set(keys); next.delete(key); return next; });
-        colorSaved = false;
-      }
-    } else {
-      const saved = await saveColor($user.id, {
-        system: 'NCS' as any,
-        code: selectedColor.pantone.code,
-        name: selectedColor.pantone.name,
-        hex: selectedColor.pantone.hex,
-      });
-      if (saved) {
-        savedColors.update(colors => [saved, ...colors]);
-        savedColorKeys.update(keys => new Set([...keys, key]));
-        colorSaved = true;
-      }
-    }
-  }
-
   function handleFile(file: File) {
     if (!file.type.startsWith('image/')) return;
 
@@ -163,27 +129,11 @@
   function clearAnalysis() {
     if (analysis?.src?.startsWith('blob:')) URL.revokeObjectURL(analysis.src);
     analysis = null;
-    selectedColor = null;
+    selectedPaletteColor.set(null);
     imageCanvas = null;
     imageRef = null;
     pickedColor = null;
     pickerMode = false;
-  }
-
-  function copyToClipboard(text: string, key: string) {
-    navigator.clipboard.writeText(text);
-    copied = key;
-    setTimeout(() => copied = null, 2000);
-  }
-
-  function getContrastClass(color: ExtractedColor): string {
-    const luminance = (0.299 * color.rgb.r + 0.587 * color.rgb.g + 0.114 * color.rgb.b) / 255;
-    return luminance > 0.5 ? 'text-slate-900' : 'text-white';
-  }
-
-  function getSubContrastClass(color: ExtractedColor): string {
-    const luminance = (0.299 * color.rgb.r + 0.587 * color.rgb.g + 0.114 * color.rgb.b) / 255;
-    return luminance > 0.5 ? 'text-slate-600' : 'text-white/70';
   }
 
   const uniquePantoneColors = $derived(analysis ? getUniquePantoneColors(analysis.colors, 10) : []);
@@ -258,7 +208,7 @@
                       <button
                         class="absolute w-4 h-4 rounded-full border-2 border-white shadow-lg -translate-x-1/2 -translate-y-1/2 hover:scale-150 transition-transform z-10"
                         style="left: {color.x * 100}%; top: {color.y * 100}%; background-color: {color.hex}"
-                        onclick={(e) => { e.stopPropagation(); selectedColor = color; }}
+                        onclick={(e) => { e.stopPropagation(); selectedPaletteColor.set(color); }}
                       ></button>
                     {/each}
                   {/if}
@@ -303,8 +253,8 @@
                   <div class="absolute top-0 left-0 w-20 h-20 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
                 </div>
               {:else}
-                <div class="w-32 h-32 bg-white rounded-[2rem] flex items-center justify-center ring-1 ring-slate-900/5">
-                  <ImageIcon class="w-12 h-12 opacity-20 text-slate-900" />
+                <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center ring-1 ring-slate-900/5">
+                  <Upload class="w-8 h-8 opacity-30 text-slate-900" />
                 </div>
                 <div class="text-center space-y-2">
                   <h2 class="text-xl font-semibold text-slate-700">{$t('palette.extract')}</h2>
@@ -334,7 +284,7 @@
             <div class="flex overflow-x-auto pb-8 pt-2 px-6 no-scrollbar">
               {#each uniquePantoneColors as color, i}
                 <button
-                  onclick={() => selectedColor = color}
+                  onclick={() => selectedPaletteColor.set(color)}
                   class="flex-shrink-0 w-28 h-40 bg-white rounded-xl overflow-hidden flex flex-col transition-all hover:scale-105 active:scale-95 mx-2 ring-1 ring-black/5 text-left group"
                 >
                   <div class="h-24 w-full" style="background-color: {color.pantone.hex}"></div>
@@ -380,105 +330,5 @@
 
   </div>
 
-  <!-- Detailed Color View Modal -->
-  {#if selectedColor}
-    {@const pantoneRgb = hexToRgb(selectedColor.pantone.hex)}
-    {@const cmyk = calculateCMYK(pantoneRgb)}
-    {@const lrv = calculateLRV(pantoneRgb)}
-    {@const textColorClass = getContrastClass(selectedColor)}
-    {@const subTextColorClass = getSubContrastClass(selectedColor)}
-
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-white sm:p-4">
-      <div class="w-full h-full max-w-md bg-white sm:rounded-[2rem] sm:h-[90vh] overflow-hidden flex flex-col relative ring-1 ring-black/5">
-
-        <!-- Header Color Block -->
-        <div
-          class="h-[40%] w-full relative transition-colors duration-500"
-          style="background-color: {selectedColor.pantone.hex}"
-        >
-          <div class="absolute top-0 left-0 w-full p-6 flex justify-between items-center {textColorClass}">
-            <button onclick={() => selectedColor = null} class="p-2 -ml-2 rounded-full hover:bg-black/10 transition-colors">
-              <ChevronLeft size={24} />
-            </button>
-            <div class="flex gap-4">
-              <button onclick={handleSaveSelectedColor} class="p-2 rounded-full hover:bg-black/10 transition-colors">
-                <Heart size={20} fill={colorSaved ? 'currentColor' : 'none'} class={colorSaved ? 'text-red-500' : ''} />
-              </button>
-              <button class="p-2 rounded-full hover:bg-black/10 transition-colors"><Share2 size={20} /></button>
-            </div>
-          </div>
-
-          <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none {textColorClass}">
-            <h2 class="text-4xl font-bold tracking-tight mb-2">PANTONE</h2>
-            <p class="text-lg font-medium tracking-wide opacity-90">{selectedColor.pantone.code}</p>
-          </div>
-        </div>
-
-        <!-- Content Section -->
-        <div class="flex-1 flex flex-col bg-white">
-          <div class="bg-gray-50/50 px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-slate-100">
-            {$t('palette.details')}
-          </div>
-
-          <div class="flex-1 overflow-y-auto p-6 space-y-8">
-            <div class="flex justify-between items-baseline">
-              <span class="text-slate-500 text-sm font-medium">{$t('palette.name')}</span>
-              <span class="text-slate-900 font-bold text-lg">{selectedColor.pantone.name}</span>
-            </div>
-
-            <div class="flex justify-between items-baseline">
-              <span class="text-slate-500 text-sm font-medium">{$t('palette.collection')}</span>
-              <span class="text-slate-900 font-medium">Pantone Connect</span>
-            </div>
-
-            <div>
-              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">{$t('palette.technical_data')}</h3>
-
-              <div class="space-y-4">
-                <div class="flex justify-between items-center py-2 border-b border-slate-50">
-                  <span class="text-slate-500 text-sm">LRV (D65)</span>
-                  <span class="text-slate-900 font-mono font-medium">{lrv}</span>
-                </div>
-
-                <div class="flex justify-between items-center py-2 border-b border-slate-50">
-                  <span class="text-slate-500 text-sm">CMYK</span>
-                  <span class="text-slate-900 font-mono font-medium">{cmyk.c}, {cmyk.m}, {cmyk.y}, {cmyk.k}</span>
-                </div>
-
-                <div class="flex justify-between items-center py-2 border-b border-slate-50">
-                  <span class="text-slate-500 text-sm">RGB</span>
-                  <span class="text-slate-900 font-mono font-medium">{pantoneRgb.r}, {pantoneRgb.g}, {pantoneRgb.b}</span>
-                </div>
-
-                <button
-                  class="flex justify-between items-center py-2 border-b border-slate-50 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded w-full"
-                  onclick={() => copyToClipboard(selectedColor!.pantone.hex.toUpperCase(), 'hex')}
-                >
-                  <span class="text-slate-500 text-sm">HEX</span>
-                  <div class="flex items-center gap-2">
-                    <span class="text-slate-900 font-mono font-medium uppercase">{selectedColor.pantone.hex}</span>
-                    {#if copied === 'hex'}
-                      <Check size={12} class="text-green-500" />
-                    {:else}
-                      <Copy size={12} class="text-slate-400" />
-                    {/if}
-                  </div>
-                </button>
-              </div>
-            </div>
-
-          </div>
-
-          <div class="p-6 border-t border-slate-100 bg-white pb-8 sm:pb-6">
-            <button class="w-full bg-slate-900 text-white font-medium py-4 rounded-xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
-              <span>{$t('palette.find_similar')}</span>
-              <span class="bg-white/20 px-1.5 py-0.5 rounded text-xs">10</span>
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  {/if}
 
 </div>
