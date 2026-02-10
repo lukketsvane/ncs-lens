@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { Upload, Image as ImageIcon, ChevronLeft, Heart, Share2, Copy, Check, Loader2 } from 'lucide-svelte';
+  import { Upload, Image as ImageIcon, ChevronLeft, Heart, Share2, Copy, Check, Loader2, X } from 'lucide-svelte';
   import { onMount } from 'svelte';
-  import { 
-    analyzeImageForPalette, 
-    getUniquePantoneColors, 
-    hexToRgb, 
-    calculateLRV, 
+  import { t } from '$lib/i18n';
+  import {
+    analyzeImageForPalette,
+    getUniquePantoneColors,
+    hexToRgb,
+    calculateLRV,
     calculateCMYK,
     type ExtractedColor,
     type PaletteAnalysis
@@ -38,7 +39,6 @@
       const img = new Image();
       img.onload = () => {
         processImage(img);
-        // Note: Don't revoke URL here as it's used for display in analysis.src
       };
       img.onerror = () => {
         loading = false;
@@ -66,7 +66,7 @@
 
   function handleFile(file: File) {
     if (!file.type.startsWith('image/')) return;
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
@@ -114,6 +114,12 @@
     lastTap = now;
   }
 
+  function clearAnalysis() {
+    if (analysis?.src?.startsWith('blob:')) URL.revokeObjectURL(analysis.src);
+    analysis = null;
+    selectedColor = null;
+  }
+
   function copyToClipboard(text: string, key: string) {
     navigator.clipboard.writeText(text);
     copied = key;
@@ -133,47 +139,55 @@
   const uniquePantoneColors = $derived(analysis ? getUniquePantoneColors(analysis.colors, 10) : []);
 </script>
 
-<div 
+<div
   class="min-h-full pb-24 safe-area-top p-4 lg:p-8"
   ondragover={handleDragOver}
   ondragleave={handleDragLeave}
   ondrop={handleDrop}
 >
   <div class="w-full max-w-[900px] mx-auto flex flex-col gap-6">
-    
+
     <!-- Page Title -->
-    <h1 class="text-2xl font-bold tracking-tight px-1">Palette</h1>
-    
+    <h1 class="text-2xl font-bold tracking-tight px-1">{$t('palette.title')}</h1>
+
     <!-- Main Card -->
     <div class="bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-slate-900/5 min-h-[600px] flex flex-col relative">
-        
+
         {#if isDragging}
           <div class="absolute inset-0 bg-blue-500/10 z-50 flex items-center justify-center backdrop-blur-md pointer-events-none transition-all">
             <div class="bg-white/80 backdrop-blur-xl p-8 rounded-3xl border border-white/50 text-center">
               <Upload class="w-16 h-16 mb-4 mx-auto text-blue-500" />
-              <p class="text-xl font-semibold text-slate-800">Drop to Analyze</p>
+              <p class="text-xl font-semibold text-slate-800">{$t('palette.drop_to_analyze')}</p>
             </div>
           </div>
         {/if}
 
         <!-- Top Section: Image Display -->
-        <button
-          class="relative flex-1 bg-slate-50 flex flex-col group cursor-pointer transition-all duration-500 {analysis ? '' : 'justify-center items-center'}"
-          ondblclick={triggerUpload}
-          ontouchend={handleTouchEnd}
-        >
-          {#if analysis}
+        {#if analysis}
+          <div class="relative flex-1 bg-slate-50 flex flex-col group transition-all duration-500">
             <div class="relative w-full h-full flex items-center justify-center overflow-hidden select-none bg-slate-50 rounded-t-[2.5rem]">
+              <button
+                onclick={clearAnalysis}
+                class="absolute top-4 right-4 z-10 p-2 bg-black/20 text-white rounded-full hover:bg-black/40 backdrop-blur-md transition-colors"
+              >
+                <X size={20} />
+              </button>
               <div class="relative w-full h-full flex items-center justify-center p-8 pb-16">
-                <img 
-                  src={analysis.src} 
-                  alt="Analysis Target" 
+                <img
+                  src={analysis.src}
+                  alt="Analysis Target"
                   class="max-h-[400px] max-w-full object-contain rounded-lg transform transition-transform hover:scale-[1.02] duration-500"
                 />
               </div>
             </div>
-          {:else}
-            <div 
+          </div>
+        {:else}
+          <button
+            class="relative flex-1 bg-slate-50 flex flex-col group cursor-pointer transition-all duration-500 justify-center items-center"
+            ondblclick={triggerUpload}
+            ontouchend={handleTouchEnd}
+          >
+            <div
               onclick={triggerUpload}
               class="flex flex-col items-center justify-center text-slate-400 gap-6 p-12 hover:scale-105 transition-transform duration-300"
             >
@@ -187,33 +201,33 @@
                   <ImageIcon class="w-12 h-12 opacity-20 text-slate-900" />
                 </div>
                 <div class="text-center space-y-2">
-                  <h2 class="text-xl font-semibold text-slate-700">Extract Palette</h2>
-                  <p class="text-sm text-slate-400">Tap to upload or drop a file</p>
+                  <h2 class="text-xl font-semibold text-slate-700">{$t('palette.extract')}</h2>
+                  <p class="text-sm text-slate-400">{$t('palette.upload_hint')}</p>
                 </div>
               {/if}
             </div>
-          {/if}
-          
-          <input 
-            bind:this={fileInput}
-            type="file" 
-            class="hidden" 
-            onchange={handleInputChange}
-            accept="image/*"
-          />
-        </button>
+          </button>
+        {/if}
+
+        <input
+          bind:this={fileInput}
+          type="file"
+          class="hidden"
+          onchange={handleInputChange}
+          accept="image/*"
+        />
 
         {#if analysis}
           <!-- Middle Section: Pantone Deck -->
           <div class="relative w-full bg-white -mt-10 rounded-t-[2.5rem] pt-8 z-10">
             <div class="px-8 mb-4 flex justify-between items-end">
-              <h3 class="text-sm font-bold text-slate-900">Extracted Palette</h3>
-              <span class="text-xs text-slate-400 font-medium">{uniquePantoneColors.length} Colors</span>
+              <h3 class="text-sm font-bold text-slate-900">{$t('palette.extracted')}</h3>
+              <span class="text-xs text-slate-400 font-medium">{$t('palette.colors_count', { count: String(uniquePantoneColors.length) })}</span>
             </div>
-            
+
             <div class="flex overflow-x-auto pb-8 pt-2 px-6 no-scrollbar">
               {#each uniquePantoneColors as color, i}
-                <button 
+                <button
                   onclick={() => selectedColor = color}
                   class="flex-shrink-0 w-28 h-40 bg-white rounded-xl overflow-hidden flex flex-col transition-all hover:scale-105 active:scale-95 mx-2 ring-1 ring-black/5 text-left group"
                 >
@@ -230,27 +244,27 @@
 
           <!-- Bottom Section: Metrics -->
           <div class="p-6 md:p-8 bg-white border-t border-slate-100">
-            <h3 class="text-sm font-bold text-slate-900 mb-6">Chromatic Data</h3>
+            <h3 class="text-sm font-bold text-slate-900 mb-6">{$t('palette.chromatic_data')}</h3>
             <div class="w-full flex flex-col">
               <div class="flex justify-between items-center py-3.5 border-b border-slate-50">
-                <span class="text-slate-500 text-xs font-medium uppercase tracking-wide">Avg Lightness</span>
+                <span class="text-slate-500 text-xs font-medium uppercase tracking-wide">{$t('palette.avg_lightness')}</span>
                 <span class="font-semibold text-slate-700 tabular-nums text-sm">{(analysis.avgLightness * 100).toFixed(1)}%</span>
               </div>
               <div class="flex justify-between items-center py-3.5 border-b border-slate-50">
-                <span class="text-slate-500 text-xs font-medium uppercase tracking-wide">Avg Chroma</span>
+                <span class="text-slate-500 text-xs font-medium uppercase tracking-wide">{$t('palette.avg_chroma')}</span>
                 <span class="font-semibold text-slate-700 tabular-nums text-sm">{analysis.avgChroma.toFixed(3)}</span>
               </div>
               <div class="flex justify-between items-center py-3.5 border-b border-slate-50">
-                <span class="text-slate-500 text-xs font-medium uppercase tracking-wide">Bias (Color)</span>
+                <span class="text-slate-500 text-xs font-medium uppercase tracking-wide">{$t('palette.bias_color')}</span>
                 <span class="font-semibold text-slate-700 tabular-nums text-sm">{analysis.colorfulnessBias.toFixed(2)}</span>
               </div>
               <div class="flex justify-between items-center py-3.5 border-b border-slate-50">
-                <span class="text-slate-500 text-xs font-medium uppercase tracking-wide">Bias (Light)</span>
+                <span class="text-slate-500 text-xs font-medium uppercase tracking-wide">{$t('palette.bias_light')}</span>
                 <span class="font-semibold text-slate-700 tabular-nums text-sm">{analysis.lightDarkBias.toFixed(2)}</span>
               </div>
               <div class="flex justify-between items-center py-3.5">
-                <span class="text-slate-500 text-xs font-medium uppercase tracking-wide">Diversity</span>
-                <span class="font-semibold text-slate-700 tabular-nums text-sm">{analysis.sparseColor ? 'High' : 'Low'}</span>
+                <span class="text-slate-500 text-xs font-medium uppercase tracking-wide">{$t('palette.diversity')}</span>
+                <span class="font-semibold text-slate-700 tabular-nums text-sm">{analysis.sparseColor ? $t('palette.high') : $t('palette.low')}</span>
               </div>
             </div>
           </div>
@@ -267,12 +281,12 @@
     {@const lrv = calculateLRV(pantoneRgb)}
     {@const textColorClass = getContrastClass(selectedColor)}
     {@const subTextColorClass = getSubContrastClass(selectedColor)}
-    
+
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-white sm:p-4">
       <div class="w-full h-full max-w-md bg-white sm:rounded-[2rem] sm:h-[90vh] overflow-hidden flex flex-col relative ring-1 ring-black/5">
-        
+
         <!-- Header Color Block -->
-        <div 
+        <div
           class="h-[40%] w-full relative transition-colors duration-500"
           style="background-color: {selectedColor.pantone.hex}"
         >
@@ -294,31 +308,24 @@
 
         <!-- Content Section -->
         <div class="flex-1 flex flex-col bg-white">
-          <div class="flex border-b border-slate-100 px-2">
-            {#each ['Details', 'Context', 'Compare', 'Fine Tune'] as tab, i}
-              <div class="flex-1 py-4 text-center text-sm font-medium cursor-pointer relative {i === 0 ? 'text-slate-900' : 'text-slate-400'}">
-                {tab}
-                {#if i === 0}
-                  <div class="absolute bottom-0 left-0 w-full h-[2px] bg-slate-900"></div>
-                {/if}
-              </div>
-            {/each}
+          <div class="bg-gray-50/50 px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-slate-100">
+            {$t('palette.details')}
           </div>
 
           <div class="flex-1 overflow-y-auto p-6 space-y-8">
             <div class="flex justify-between items-baseline">
-              <span class="text-slate-500 text-sm font-medium">Name</span>
+              <span class="text-slate-500 text-sm font-medium">{$t('palette.name')}</span>
               <span class="text-slate-900 font-bold text-lg">{selectedColor.pantone.name}</span>
             </div>
 
             <div class="flex justify-between items-baseline">
-              <span class="text-slate-500 text-sm font-medium">Collection</span>
+              <span class="text-slate-500 text-sm font-medium">{$t('palette.collection')}</span>
               <span class="text-slate-900 font-medium">Pantone Connect</span>
             </div>
 
             <div>
-              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Technical Data</h3>
-              
+              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">{$t('palette.technical_data')}</h3>
+
               <div class="space-y-4">
                 <div class="flex justify-between items-center py-2 border-b border-slate-50">
                   <span class="text-slate-500 text-sm">LRV (D65)</span>
@@ -335,7 +342,7 @@
                   <span class="text-slate-900 font-mono font-medium">{pantoneRgb.r}, {pantoneRgb.g}, {pantoneRgb.b}</span>
                 </div>
 
-                <button 
+                <button
                   class="flex justify-between items-center py-2 border-b border-slate-50 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded w-full"
                   onclick={() => copyToClipboard(selectedColor!.pantone.hex.toUpperCase(), 'hex')}
                 >
@@ -356,7 +363,7 @@
 
           <div class="p-6 border-t border-slate-100 bg-white pb-8 sm:pb-6">
             <button class="w-full bg-slate-900 text-white font-medium py-4 rounded-xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
-              <span>Find Similar Colors</span>
+              <span>{$t('palette.find_similar')}</span>
               <span class="bg-white/20 px-1.5 py-0.5 rounded text-xs">10</span>
             </button>
           </div>

@@ -14,12 +14,10 @@
   import ResultView from '$lib/components/ResultView.svelte';
   import ColorDetailView from '$lib/components/ColorDetailView.svelte';
 
-  // Load data on mount
   onMount(async () => {
     await loadData();
   });
 
-  // Reload data when user changes
   $effect(() => {
     if ($user !== undefined) {
       loadData();

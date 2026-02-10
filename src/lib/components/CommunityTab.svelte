@@ -3,6 +3,7 @@
   import { user } from '$lib/stores/auth';
   import { communityItems, detailItem, detailColor, activeTab } from '$lib/stores/app';
   import { likeScan, unlikeScan } from '$lib/scans';
+  import { t } from '$lib/i18n';
   import type { HistoryItem, ColorMatch, SortOption } from '$lib/stores/app';
 
   let searchQuery = $state('');
@@ -36,27 +37,27 @@
 
   const filteredAndSortedItems = $derived.by(() => {
     let result = displayItems;
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       result = result.filter(item => {
         if (item.result.productType.toLowerCase().includes(query)) return true;
-        if (item.result.materials.some(m => 
-          m.name.toLowerCase().includes(query) || 
+        if (item.result.materials.some(m =>
+          m.name.toLowerCase().includes(query) ||
           m.finish.toLowerCase().includes(query)
         )) return true;
-        if (item.result.colors.some(c => 
-          c.name.toLowerCase().includes(query) || 
+        if (item.result.colors.some(c =>
+          c.name.toLowerCase().includes(query) ||
           c.code.toLowerCase().includes(query)
         )) return true;
         if (item.author && item.author.toLowerCase().includes(query)) return true;
         return false;
       });
     }
-    
+
     const now = Date.now();
     const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
-    
+
     result = [...result].sort((a, b) => {
       switch (sortBy) {
         case 'trending':
@@ -73,15 +74,15 @@
           return 0;
       }
     });
-    
+
     return result;
   });
 
-  const sortOptions = [
-    { value: 'trending' as SortOption, label: 'Trending This Week' },
-    { value: 'newest' as SortOption, label: 'Newest First' },
-    { value: 'most_liked' as SortOption, label: 'Most Liked' },
-  ];
+  const sortOptions = $derived([
+    { value: 'trending' as SortOption, label: $t('community.trending') },
+    { value: 'newest' as SortOption, label: $t('community.newest') },
+    { value: 'most_liked' as SortOption, label: $t('community.most_liked') },
+  ]);
 
   async function handleLike(scanId: string, isCurrentlyLiked: boolean) {
     if (!$user) {
@@ -89,7 +90,6 @@
       return;
     }
 
-    // Optimistic update
     communityItems.update(items => items.map(item => {
       if (item.id === scanId) {
         return {
@@ -101,12 +101,11 @@
       return item;
     }));
 
-    const success = isCurrentlyLiked 
+    const success = isCurrentlyLiked
       ? await unlikeScan(scanId, $user.id)
       : await likeScan(scanId, $user.id);
 
     if (!success) {
-      // Revert on failure
       communityItems.update(items => items.map(item => {
         if (item.id === scanId) {
           return {
@@ -138,11 +137,11 @@
           <input
             type="text"
             bind:value={searchQuery}
-            placeholder="Search products, colors, materials..."
+            placeholder={$t('community.search_placeholder')}
             class="w-full pl-9 pr-4 py-2.5 bg-white rounded-xl text-sm font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10"
           />
         </div>
-        <button 
+        <button
           onclick={() => { showSearch = false; searchQuery = ''; }}
           class="p-2 text-gray-500 hover:text-gray-700"
         >
@@ -150,12 +149,12 @@
         </button>
       </div>
     {:else}
-      <h1 class="text-2xl font-bold tracking-tight">Discover</h1>
+      <h1 class="text-2xl font-bold tracking-tight">{$t('community.title')}</h1>
       <div class="flex items-center gap-2">
-        <button 
+        <button
           onclick={() => paletteView = !paletteView}
           class="p-2 rounded-full transition-colors {paletteView ? 'bg-gray-900 text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}"
-          title={paletteView ? 'Show cards with images' : 'Show palette only'}
+          title={paletteView ? $t('community.show_cards') : $t('community.show_palette')}
         >
           {#if paletteView}
             <LayoutGrid size={20} />
@@ -163,7 +162,7 @@
             <Grid3x3 size={20} />
           {/if}
         </button>
-        <button 
+        <button
           onclick={() => showSearch = true}
           class="p-2 bg-white rounded-full hover:bg-gray-50 transition-colors"
         >
@@ -189,14 +188,14 @@
         <span>{sortOptions.find(o => o.value === sortBy)?.label}</span>
         <ChevronDown size={14} class="transition-transform {showSortMenu ? 'rotate-180' : ''}" />
       </button>
-      
+
       {#if showSortMenu}
         <div class="absolute top-full left-1 mt-1 bg-white rounded-xl border border-gray-100 py-1 z-20 min-w-[180px]">
           {#each sortOptions as option}
             <button
               onclick={() => { sortBy = option.value; showSortMenu = false; }}
-              class="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors {sortBy === option.value 
-                ? 'bg-gray-100 text-gray-900' 
+              class="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors {sortBy === option.value
+                ? 'bg-gray-100 text-gray-900'
                 : 'text-gray-600 hover:bg-gray-50'}"
             >
               {#if option.value === 'trending'}
@@ -218,24 +217,24 @@
     <div class="flex flex-col items-center justify-center h-[50vh] text-gray-400">
       {#if searchQuery}
         <Search size={48} class="mb-4 opacity-20" />
-        <p>No results for "{searchQuery}"</p>
+        <p>{$t('community.no_results', { query: searchQuery })}</p>
       {:else}
         <Globe size={48} class="mb-4 opacity-20" />
-        <p>No shared items yet</p>
+        <p>{$t('community.no_items')}</p>
       {/if}
     </div>
   {:else if paletteView}
-    <div class="grid grid-cols-3 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
       {#each filteredAndSortedItems as item (item.id)}
-        <div 
-          onclick={() => selectItem(item)} 
+        <div
+          onclick={() => selectItem(item)}
           class="bg-white rounded-2xl border border-gray-100 overflow-hidden cursor-pointer active:scale-[0.98] transition-all"
           role="button"
           tabindex="0"
         >
           <div class="flex h-20">
             {#each item.result.colors.slice(0, 4) as color}
-              <button 
+              <button
                 class="flex-1 hover:opacity-80 transition-opacity"
                 style="background-color: {color.hex}"
                 onclick={(e) => { e.stopPropagation(); selectColor(color); }}
@@ -245,11 +244,11 @@
           <div class="p-2">
             <p class="text-[10px] font-bold text-gray-900 truncate">{item.result.productType}</p>
             <div class="flex items-center justify-between mt-1">
-              <p class="text-[9px] text-gray-400">{item.result.colors.length} colors</p>
+              <p class="text-[9px] text-gray-400">{$t('community.colors_count', { count: String(item.result.colors.length) })}</p>
               <button
                 onclick={(e) => { e.stopPropagation(); handleLike(item.id, item.isLiked ?? false); }}
-                class="flex items-center gap-0.5 text-[10px] transition-colors {item.isLiked 
-                  ? 'text-red-500' 
+                class="flex items-center gap-0.5 text-[10px] transition-colors {item.isLiked
+                  ? 'text-red-500'
                   : 'text-gray-400 hover:text-red-400'}"
               >
                 <Heart size={10} fill={item.isLiked ? 'currentColor' : 'none'} />
@@ -263,10 +262,10 @@
       {/each}
     </div>
   {:else}
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
       {#each filteredAndSortedItems as item (item.id)}
-        <div 
-          onclick={() => selectItem(item)} 
+        <div
+          onclick={() => selectItem(item)}
           class="bg-white p-3 rounded-2xl border border-white flex flex-col gap-3 cursor-pointer active:scale-[0.98] transition-all"
           role="button"
           tabindex="0"
@@ -279,8 +278,8 @@
             <div class="flex items-center justify-between mt-2">
               <div class="flex items-center gap-1">
                 {#each item.result.colors.slice(0, 3) as color}
-                  <button 
-                    class="w-3 h-3 rounded-full border border-black/5 cursor-pointer hover:scale-125 transition-transform" 
+                  <button
+                    class="w-3 h-3 rounded-full border border-black/5 cursor-pointer hover:scale-125 transition-transform"
                     style="background-color: {color.hex}"
                     onclick={(e) => { e.stopPropagation(); selectColor(color); }}
                   ></button>
@@ -288,8 +287,8 @@
               </div>
               <button
                 onclick={(e) => { e.stopPropagation(); handleLike(item.id, item.isLiked ?? false); }}
-                class="flex items-center gap-1 text-xs transition-colors {item.isLiked 
-                  ? 'text-red-500' 
+                class="flex items-center gap-1 text-xs transition-colors {item.isLiked
+                  ? 'text-red-500'
                   : 'text-gray-400 hover:text-red-400'}"
               >
                 <Heart size={14} fill={item.isLiked ? 'currentColor' : 'none'} />
@@ -299,7 +298,7 @@
               </button>
             </div>
             {#if item.author}
-              <p class="text-[10px] text-gray-400 mt-2">by {item.author}</p>
+              <p class="text-[10px] text-gray-400 mt-2">{$t('result.by_author', { author: item.author })}</p>
             {/if}
           </div>
         </div>

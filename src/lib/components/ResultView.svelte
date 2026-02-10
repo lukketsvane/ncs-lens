@@ -5,6 +5,8 @@
   import { publishScan, unpublishScan, updateScan } from '$lib/scans';
   import { analyzeImage } from '$lib/api';
   import { swipeGesture } from '$lib/actions/swipeGesture';
+  import { toasts } from '$lib/stores/toast';
+  import { t } from '$lib/i18n';
   import type { ColorMatch, AnalysisResult } from '$lib/stores/app';
 
   let isPublishing = $state(false);
@@ -28,9 +30,7 @@
     return yiq >= 128 ? 'text-black' : 'text-white';
   }
 
-  function handleBack() {
-    detailItem.set(null);
-  }
+  function handleBack() { detailItem.set(null); }
 
   async function handlePublish() {
     if (!$detailItem || isPublic) return;
@@ -39,9 +39,7 @@
     if (success) {
       isPublic = true;
       detailItem.update(item => item ? { ...item, isPublic: true } : null);
-      history.update(items => items.map(item => 
-        item.id === $detailItem!.id ? { ...item, isPublic: true } : item
-      ));
+      history.update(items => items.map(item => item.id === $detailItem!.id ? { ...item, isPublic: true } : item));
       communityItems.update(items => [...items, { ...$detailItem!, author: "You", isPublic: true }]);
     }
     isPublishing = false;
@@ -54,30 +52,21 @@
     if (success) {
       isPublic = false;
       detailItem.update(item => item ? { ...item, isPublic: false } : null);
-      history.update(items => items.map(item => 
-        item.id === $detailItem!.id ? { ...item, isPublic: false } : item
-      ));
+      history.update(items => items.map(item => item.id === $detailItem!.id ? { ...item, isPublic: false } : item));
       communityItems.update(items => items.filter(item => item.id !== $detailItem!.id));
     }
     isUnpublishing = false;
   }
 
   async function handleSaveProductType() {
-    if (!$detailItem || editedProductType === $detailItem.result.productType) {
-      editingProductType = false;
-      return;
-    }
+    if (!$detailItem || editedProductType === $detailItem.result.productType) { editingProductType = false; return; }
     const newResult = { ...$detailItem.result, productType: editedProductType };
     const success = await updateScan($detailItem.id, { result: newResult });
     if (success) {
       detailItem.update(item => item ? { ...item, result: newResult } : null);
-      history.update(items => items.map(item => 
-        item.id === $detailItem!.id ? { ...item, result: newResult } : item
-      ));
+      history.update(items => items.map(item => item.id === $detailItem!.id ? { ...item, result: newResult } : item));
       if ($detailItem.isPublic) {
-        communityItems.update(items => items.map(item => 
-          item.id === $detailItem!.id ? { ...item, result: newResult } : item
-        ));
+        communityItems.update(items => items.map(item => item.id === $detailItem!.id ? { ...item, result: newResult } : item));
       }
     }
     editingProductType = false;
@@ -101,120 +90,71 @@
         });
         base64 = dataUrl.split(",")[1];
       }
-      
       const result = await analyzeImage(base64, $salientMode);
       await updateScan($detailItem.id, { result });
-      
       const updatedItem = { ...$detailItem, result, timestamp: Date.now() };
       detailItem.set(updatedItem);
-      history.update(items => items.map(item => 
-        item.id === $detailItem!.id ? updatedItem : item
-      ));
+      history.update(items => items.map(item => item.id === $detailItem!.id ? updatedItem : item));
     } catch (err) {
       console.error('Regeneration failed:', err);
-      alert("Regeneration failed.");
+      toasts.error($t('result.regeneration_failed'));
     } finally {
       loading.set(false);
     }
   }
 
-  function selectColor(color: ColorMatch) {
-    detailColor.set(color);
-  }
+  function selectColor(color: ColorMatch) { detailColor.set(color); }
 </script>
 
 {#if $detailItem}
-  <div 
-    class="fixed inset-0 bg-[#F0F2F5] z-40 overflow-y-auto no-scrollbar safe-area-top safe-area-bottom"
-    use:swipeGesture={{ onSwipeRight: handleBack, threshold: 50, edgeThreshold: 40 }}
-  >
+  <div class="fixed inset-0 bg-[#F0F2F5] z-40 overflow-y-auto no-scrollbar safe-area-top safe-area-bottom" use:swipeGesture={{ onSwipeRight: handleBack, threshold: 50, edgeThreshold: 40 }}>
     <div class="p-4 min-h-full pb-20">
       <div class="flex justify-between items-center mb-6">
-        <button onclick={handleBack} class="p-2 bg-white rounded-full hover:bg-gray-100">
-          <ChevronLeft size={20} />
-        </button>
-        
+        <button onclick={handleBack} class="p-2 bg-white rounded-full hover:bg-gray-100"><ChevronLeft size={20} /></button>
+
         <div class="flex items-center gap-1 max-w-[200px]">
           {#if editingProductType}
             <div class="flex items-center gap-1">
-              <input
-                type="text"
-                bind:value={editedProductType}
-                class="font-semibold text-center bg-white px-2 py-1 rounded-lg text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/10 max-w-[160px]"
-                onkeydown={(e) => {
-                  if (e.key === 'Enter') handleSaveProductType();
-                  if (e.key === 'Escape') {
-                    editedProductType = $detailItem!.result.productType;
-                    editingProductType = false;
-                  }
-                }}
-              />
-              <button 
-                onclick={handleSaveProductType}
-                class="p-1 hover:bg-gray-100 rounded-full"
-              >
-                <Check size={14} class="text-green-600" />
-              </button>
+              <input type="text" bind:value={editedProductType} class="font-semibold text-center bg-white px-2 py-1 rounded-lg text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/10 max-w-[160px]"
+                onkeydown={(e) => { if (e.key === 'Enter') handleSaveProductType(); if (e.key === 'Escape') { editedProductType = $detailItem!.result.productType; editingProductType = false; } }} />
+              <button onclick={handleSaveProductType} class="p-1 hover:bg-gray-100 rounded-full"><Check size={14} class="text-green-600" /></button>
             </div>
           {:else}
             <span class="font-semibold truncate text-center">{$detailItem.result.productType}</span>
             {#if isOwner}
-              <button 
-                onclick={() => editingProductType = true}
-                class="p-1 hover:bg-gray-100 rounded-full opacity-40 hover:opacity-100 transition-opacity"
-                title="Edit product name"
-              >
-                <Pencil size={12} />
-              </button>
+              <button onclick={() => editingProductType = true} class="p-1 hover:bg-gray-100 rounded-full opacity-40 hover:opacity-100 transition-opacity" title={$t('result.edit_name')}><Pencil size={12} /></button>
             {/if}
           {/if}
         </div>
-        
+
         {#if isOwner}
-          <button 
-            onclick={isPublic ? handleUnpublish : handlePublish}
-            disabled={isPublishing || isUnpublishing}
+          <button onclick={isPublic ? handleUnpublish : handlePublish} disabled={isPublishing || isUnpublishing}
             class="p-2 rounded-full transition-all duration-300 {isPublic ? 'bg-green-100 text-green-700' : 'bg-white text-gray-500'}"
-            title={isPublic ? 'Public - click to make private' : 'Private - click to publish'}
-          >
-            {#if isPublishing || isUnpublishing}
-              <Loader2 size={20} class="animate-spin" />
-            {:else if isPublic}
-              <Globe size={20} />
-            {:else}
-              <Lock size={20} />
-            {/if}
+            title={isPublic ? $t('result.public_hint') : $t('result.private_hint')}>
+            {#if isPublishing || isUnpublishing}<Loader2 size={20} class="animate-spin" />{:else if isPublic}<Globe size={20} />{:else}<Lock size={20} />{/if}
           </button>
-        {:else}
-          <div class="w-10"></div>
-        {/if}
+        {:else}<div class="w-10"></div>{/if}
       </div>
 
       <div class="max-w-md mx-auto space-y-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
         <div class="relative rounded-[32px] overflow-hidden bg-gray-200 aspect-square group">
           <img src={$detailItem.image} class="w-full h-full object-cover" alt="Product" />
           {#if isOwner}
-            <button 
-              onclick={handleRegenerate}
-              class="absolute bottom-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-semibold hover:bg-white transition-colors"
-            >
-              <RotateCcw size={14} class="text-gray-600" />
-              <span class="text-gray-800">Re-analyze</span>
+            <button onclick={handleRegenerate} class="absolute bottom-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-semibold hover:bg-white transition-colors">
+              <RotateCcw size={14} class="text-gray-600" /><span class="text-gray-800">{$t('result.reanalyze')}</span>
             </button>
           {/if}
           {#if $detailItem.author}
-            <div class="absolute bottom-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-medium text-white">
-              by {$detailItem.author}
-            </div>
+            <div class="absolute bottom-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-medium text-white">{$t('result.by_author', { author: $detailItem.author })}</div>
           {/if}
         </div>
 
         <div class="bg-white rounded-[24px] p-5 border border-white/50">
-          <div class="text-sm text-gray-400 font-medium mb-1">Materials</div>
+          <div class="text-sm text-gray-400 font-medium mb-1">{$t('result.materials')}</div>
           <div class="flex flex-wrap gap-2">
             {#each $detailItem.result.materials as material}
               <span class="px-3 py-1.5 bg-gray-100 rounded-full text-xs font-semibold text-gray-600 border border-gray-200">
-                {material.name} <span class="opacity-50 font-normal">· {material.finish}</span>
+                {material.name} <span class="opacity-50 font-normal">&middot; {material.finish}</span>
               </span>
             {/each}
           </div>
@@ -224,36 +164,19 @@
           {#each $detailItem.result.colors as color, i}
             {@const textColorClass = getContrastColor(color.hex)}
             {@const isFull = i === 0 && $detailItem.result.colors.length % 2 !== 0}
-            
-            <div 
-              class="relative group rounded-[24px] p-5 flex flex-col justify-between h-40 transition-transform {isFull ? 'col-span-2' : 'col-span-1'}"
-              style="background-color: {color.hex}"
-            >
+            <div class="relative group rounded-[24px] p-5 flex flex-col justify-between h-40 transition-transform {isFull ? 'col-span-2' : 'col-span-1'}" style="background-color: {color.hex}">
               <div class="flex justify-between items-start {textColorClass} opacity-80">
                 <span class="text-[10px] font-bold tracking-widest uppercase bg-black/10 backdrop-blur-sm px-2 py-1 rounded-lg border border-white/10">{color.system}</span>
-                
                 <div class="flex items-center gap-2">
                   {#if isOwner}
-                    <button 
-                      onclick={(e) => { e.stopPropagation(); handleRegenerate(); }}
-                      class="p-1.5 rounded-full hover:bg-black/10 transition-colors"
-                    >
+                    <button onclick={(e) => { e.stopPropagation(); handleRegenerate(); }} class="p-1.5 rounded-full hover:bg-black/10 transition-colors">
                       <RefreshCw size={14} class={textColorClass === 'text-black' ? 'text-black/60' : 'text-white/80'} />
                     </button>
                   {/if}
-                  <button
-                    onclick={() => selectColor(color)}
-                    class="cursor-pointer"
-                  >
-                    <ArrowRight size={16} />
-                  </button>
+                  <button onclick={() => selectColor(color)} class="cursor-pointer"><ArrowRight size={16} /></button>
                 </div>
               </div>
-              
-              <button 
-                onclick={() => selectColor(color)}
-                class="cursor-pointer {textColorClass} text-left"
-              >
+              <button onclick={() => selectColor(color)} class="cursor-pointer {textColorClass} text-left">
                 <div class="text-3xl font-bold tracking-tighter">{color.code.split(" ").pop()}</div>
                 <div class="text-xs font-medium opacity-80 truncate mt-1">{color.name}</div>
               </button>
