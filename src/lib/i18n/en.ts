@@ -129,6 +129,22 @@ const en: Record<string, string> = {
   'color.from_product': 'From: {product}',
   'color.match': 'Match',
   'color.reset': 'Reset to Original',
+  'color.confirm': 'Confirm Change',
+  'color.no_context': 'No material data available',
+  'color.no_context_hint': 'Scan a product to identify materials',
+  'color.delta_e': 'ΔE',
+  'color.saved_colors_section': 'Saved Colors',
+
+  // Palette extras
+  'palette.show_points': 'Show extraction points',
+  'palette.pick_color': 'Pick color from image',
+  'palette.tap_to_pick': 'Tap on image to pick a color',
+
+  // User profile
+  'profile.public_scans': 'Public Scans',
+  'profile.member_since': 'Member since {date}',
+  'profile.no_public_scans': 'No public scans yet',
+  'profile.anonymous': 'Anonymous',
 
   // Curated comparison names
   'color.pure_white': 'Pure White',

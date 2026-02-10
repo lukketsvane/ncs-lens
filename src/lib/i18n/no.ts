@@ -129,6 +129,22 @@ const no: Record<string, string> = {
   'color.from_product': 'Frå: {product}',
   'color.match': 'Treff',
   'color.reset': 'Tilbakestill til original',
+  'color.confirm': 'Stadfest endring',
+  'color.no_context': 'Ingen materialdata tilgjengeleg',
+  'color.no_context_hint': 'Skann eit produkt for å identifisere materialar',
+  'color.delta_e': 'ΔE',
+  'color.saved_colors_section': 'Lagra fargar',
+
+  // Palette extras
+  'palette.show_points': 'Vis uttrekkspunkt',
+  'palette.pick_color': 'Plukk farge frå bilete',
+  'palette.tap_to_pick': 'Trykk på bilete for å plukke ein farge',
+
+  // User profile
+  'profile.public_scans': 'Offentlege skanningar',
+  'profile.member_since': 'Medlem sidan {date}',
+  'profile.no_public_scans': 'Ingen offentlege skanningar enno',
+  'profile.anonymous': 'Anonym',
 
   // Curated comparison names
   'color.pure_white': 'Reint kvit',
