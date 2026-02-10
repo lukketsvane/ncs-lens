@@ -56,7 +56,7 @@
 
 <div class="min-h-full pb-24 safe-area-top">
   <div class="p-4 flex flex-col min-h-[calc(100vh-6rem)]">
-    <h1 class="text-2xl font-bold tracking-tight mb-8 mt-2 px-1">{$t('scan.title')}</h1>
+    <h1 class="text-2xl font-bold tracking-tight mb-6 px-1">{$t('scan.title')}</h1>
 
     <div class="flex-1 flex flex-col justify-center items-center pb-12">
       {#if $loading}

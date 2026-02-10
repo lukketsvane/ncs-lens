@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { ChevronLeft, RotateCcw, Globe, Lock, Loader2, RefreshCw, Pencil, Check, ArrowRight, Heart, GitCompare } from 'lucide-svelte';
+  import { ChevronLeft, RotateCcw, Globe, Lock, Loader2, RefreshCw, Pencil, Check, ArrowRight, Heart, GitCompare, Bookmark } from 'lucide-svelte';
   import { user } from '$lib/stores/auth';
-  import { detailItem, detailColor, history, communityItems, loading, salientMode, savedColorKeys, savedColors, compareTarget } from '$lib/stores/app';
+  import { detailItem, detailColor, history, communityItems, loading, salientMode, savedColorKeys, savedColors, compareTarget, boardSelectorScanId } from '$lib/stores/app';
   import { publishScan, unpublishScan, updateScan } from '$lib/scans';
   import { saveColor, unsaveColor } from '$lib/saved-colors';
   import { analyzeImage } from '$lib/api';
@@ -18,10 +18,13 @@
   let swipeProgress = $state(0);
   let swipeReturning = $state(false);
   let editedProductType = $state($detailItem?.result.productType ?? '');
+  let editingDescription = $state(false);
+  let editedDescription = $state($detailItem?.result.description ?? '');
 
   $effect(() => {
     isPublic = $detailItem?.isPublic ?? false;
     editedProductType = $detailItem?.result.productType ?? '';
+    editedDescription = $detailItem?.result.description ?? '';
   });
 
   const isOwner = $derived(!!($user && !$detailItem?.author));
@@ -74,6 +77,20 @@
       }
     }
     editingProductType = false;
+  }
+
+  async function handleSaveDescription() {
+    if (!$detailItem) { editingDescription = false; return; }
+    const newResult = { ...$detailItem.result, description: editedDescription || undefined };
+    const success = await updateScan($detailItem.id, { result: newResult });
+    if (success) {
+      detailItem.update(item => item ? { ...item, result: newResult } : null);
+      history.update(items => items.map(item => item.id === $detailItem!.id ? { ...item, result: newResult } : item));
+      if ($detailItem.isPublic) {
+        communityItems.update(items => items.map(item => item.id === $detailItem!.id ? { ...item, result: newResult } : item));
+      }
+    }
+    editingDescription = false;
   }
 
   async function handleRegenerate() {
@@ -210,6 +227,15 @@
               {$t('result.by_author', { author: $detailItem.author })}
             </button>
           {/if}
+          {#if $user}
+            <button
+              onclick={() => boardSelectorScanId.set($detailItem!.id)}
+              class="absolute top-4 right-4 bg-white/90 backdrop-blur-md p-2 rounded-full hover:bg-white transition-colors"
+              title={$t('boards.add_to_board')}
+            >
+              <Bookmark size={16} class="text-gray-700" />
+            </button>
+          {/if}
         </div>
 
         <div class="bg-white rounded-[24px] p-5 border border-white/50">
@@ -222,6 +248,32 @@
             {/each}
           </div>
         </div>
+
+        {#if isOwner || $detailItem.result.description}
+          <div class="bg-white rounded-[24px] p-5 border border-white/50">
+            {#if editingDescription}
+              <textarea
+                bind:value={editedDescription}
+                placeholder={$t('result.description_placeholder')}
+                rows="3"
+                class="w-full text-sm text-gray-700 bg-gray-50 rounded-xl px-4 py-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 resize-none"
+                onkeydown={(e) => { if (e.key === 'Escape') { editedDescription = $detailItem!.result.description ?? ''; editingDescription = false; } }}
+              ></textarea>
+              <div class="flex justify-end gap-2 mt-2">
+                <button onclick={() => { editedDescription = $detailItem!.result.description ?? ''; editingDescription = false; }} class="text-xs text-gray-500 px-3 py-1.5 rounded-lg hover:bg-gray-100">{$t('color.back')}</button>
+                <button onclick={handleSaveDescription} class="text-xs font-semibold text-white bg-gray-900 px-3 py-1.5 rounded-lg hover:bg-black"><Check size={12} class="inline mr-1" />{$t('profile.save_changes')}</button>
+              </div>
+            {:else if $detailItem.result.description}
+              <button onclick={() => { if (isOwner) editingDescription = true; }} class="text-sm text-gray-600 leading-relaxed text-left w-full {isOwner ? 'cursor-pointer hover:text-gray-900' : 'cursor-default'}">
+                {$detailItem.result.description}
+              </button>
+            {:else if isOwner}
+              <button onclick={() => editingDescription = true} class="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                + {$t('result.add_description')}
+              </button>
+            {/if}
+          </div>
+        {/if}
 
         <div class="grid grid-cols-2 gap-3 pb-8">
           {#each $detailItem.result.colors as color, i}

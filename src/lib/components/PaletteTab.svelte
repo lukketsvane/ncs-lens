@@ -148,7 +148,7 @@
   <div class="w-full max-w-[900px] mx-auto flex flex-col gap-6">
 
     <!-- Page Title -->
-    <h1 class="text-2xl font-bold tracking-tight px-1">{$t('palette.title')}</h1>
+    <h1 class="text-2xl font-bold tracking-tight mb-6 px-1">{$t('palette.title')}</h1>
 
     <!-- Main Card -->
     <div class="bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-slate-900/5 min-h-[600px] flex flex-col relative">

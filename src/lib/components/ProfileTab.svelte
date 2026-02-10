@@ -1,8 +1,11 @@
 <script lang="ts">
-  import { Loader2, Mail, Lock, ArrowRight, AlertCircle, User, LogOut, CheckCircle2, Camera, ChevronRight, FileText } from 'lucide-svelte';
+  import { Loader2, Mail, Lock, ArrowRight, AlertCircle, User, LogOut, CheckCircle2, Camera, ChevronRight, FileText, Globe } from 'lucide-svelte';
   import { user, signIn, signUp, signOut } from '$lib/stores/auth';
   import { supabase } from '$lib/supabase';
   import { uploadAvatar } from '$lib/storage';
+  import { getPublicScansByUser, type ScanRecord } from '$lib/scans';
+  import { detailItem } from '$lib/stores/app';
+  import type { HistoryItem } from '$lib/stores/app';
   import { goto } from '$app/navigation';
   import { toasts } from '$lib/stores/toast';
   import { t, locale } from '$lib/i18n';
@@ -11,6 +14,7 @@
     id: string;
     display_name: string | null;
     avatar_url: string | null;
+    bio: string | null;
     updated_at: string | null;
   }
 
@@ -25,10 +29,12 @@
   let displayName = $state('');
   let avatarUrl = $state<string | null>(null);
   let profileLoading = $state(true);
+  let bio = $state('');
   let saving = $state(false);
   let saved = $state(false);
   let uploadingAvatar = $state(false);
   let avatarInput: HTMLInputElement;
+  let publicScans = $state<HistoryItem[]>([]);
 
   $effect(() => {
     if ($user) {
@@ -41,13 +47,25 @@
   async function fetchProfile() {
     if (!$user) return;
     profileLoading = true;
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', $user.id).single();
+    const [profileResult, scansData] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', $user.id).single(),
+      getPublicScansByUser($user.id),
+    ]);
+    const { data, error } = profileResult;
     if (error && error.code !== 'PGRST116') console.error('Error fetching profile:', error);
     if (data) {
       profile = data;
       displayName = data.display_name || '';
       avatarUrl = data.avatar_url;
+      bio = data.bio || '';
     }
+    publicScans = scansData.map((scan: ScanRecord) => ({
+      id: scan.id,
+      timestamp: new Date(scan.created_at).getTime(),
+      image: scan.image_url,
+      result: scan.result,
+      isPublic: true,
+    }));
     profileLoading = false;
   }
 
@@ -112,7 +130,7 @@
     if (!$user) return;
     saving = true;
     saved = false;
-    const { error } = await supabase.from('profiles').upsert({ id: $user.id, display_name: displayName, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    const { error } = await supabase.from('profiles').upsert({ id: $user.id, display_name: displayName, bio, updated_at: new Date().toISOString() }, { onConflict: 'id' });
     if (error) {
       console.error('Error updating profile:', error);
       toasts.error($t('profile.profile_update_failed'));
@@ -218,6 +236,10 @@
             <input type="text" bind:value={displayName} placeholder={$t('profile.enter_name')} class="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 transition-all" />
           </div>
           <div class="space-y-2">
+            <label class="text-sm font-medium text-gray-600">{$t('profile.bio')}</label>
+            <textarea bind:value={bio} placeholder={$t('profile.bio_placeholder')} rows="3" class="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 transition-all resize-none"></textarea>
+          </div>
+          <div class="space-y-2">
             <label class="text-sm font-medium text-gray-600">{$t('profile.email')}</label>
             <div class="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
               <Mail size={16} class="text-gray-400" /><span class="text-sm text-gray-600">{$user?.email}</span>
@@ -243,6 +265,37 @@
             <div class="flex items-center gap-3"><LogOut size={18} /><span class="font-medium">{$t('profile.sign_out')}</span></div>
             <ChevronRight size={18} class="text-gray-400" />
           </button>
+        </div>
+
+        <div>
+          <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 px-1">{$t('profile.my_public_scans')}</h3>
+          {#if publicScans.length === 0}
+            <div class="flex flex-col items-center justify-center py-12 text-gray-400">
+              <Globe size={32} class="mb-3 opacity-20" />
+              <p class="text-sm">{$t('profile.no_public_scans_self')}</p>
+            </div>
+          {:else}
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {#each publicScans as item (item.id)}
+                <button
+                  onclick={() => detailItem.set(item)}
+                  class="bg-white p-3 rounded-2xl border border-white flex flex-col gap-3 cursor-pointer active:scale-[0.98] transition-all text-left"
+                >
+                  <div class="relative aspect-square rounded-xl overflow-hidden bg-gray-100">
+                    <img src={item.image} class="w-full h-full object-cover" loading="lazy" alt={item.result.productType} />
+                  </div>
+                  <div class="min-w-0">
+                    <h3 class="font-bold text-gray-900 text-sm truncate leading-tight">{item.result.productType}</h3>
+                    <div class="flex items-center gap-1 mt-2">
+                      {#each item.result.colors.slice(0, 4) as color}
+                        <div class="w-3 h-3 rounded-full border border-black/5" style="background-color: {color.hex}"></div>
+                      {/each}
+                    </div>
+                  </div>
+                </button>
+              {/each}
+            </div>
+          {/if}
         </div>
 
         <div class="text-center text-xs text-gray-400 pt-4">

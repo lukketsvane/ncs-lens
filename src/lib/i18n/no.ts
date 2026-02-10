@@ -14,8 +14,8 @@ const no: Record<string, string> = {
   'scan.sign_in_desc': 'Opprett ein konto eller logg inn for å skanne materialar og fargar.',
   'scan.sign_in_button': 'Logg inn / Registrer',
   'scan.new_scan': 'Nytt skann',
-  'scan.salient': 'Framtredande',
-  'scan.help_text': 'Ta eit bilde for å identifisere NCS/RAL-kodar og materialoverflater på sekundet.',
+  'scan.salient': 'Hovudfargar',
+  'scan.help_text': 'ta eit bilde for å identifisere NCS/RAL-kodar og materialoverflater på sekundet.',
   'scan.failed': 'Analysen feila. Prøv igjen.',
 
   // PaletteTab
@@ -89,6 +89,10 @@ const no: Record<string, string> = {
   'profile.avatar_update_failed': 'Klarte ikkje oppdatere profilbilde',
   'profile.avatar_upload_failed': 'Klarte ikkje laste opp profilbilde',
   'profile.profile_update_failed': 'Klarte ikkje oppdatere profil',
+  'profile.bio': 'Bio',
+  'profile.bio_placeholder': 'Skriv litt om deg sjølv...',
+  'profile.my_public_scans': 'Mine offentlege skanningar',
+  'profile.no_public_scans_self': 'Ingen publiserte skanningar enno',
 
   // ResultView
   'result.edit_name': 'Rediger produktnamn',
@@ -98,6 +102,8 @@ const no: Record<string, string> = {
   'result.materials': 'Materialar',
   'result.regeneration_failed': 'Ny analyse feila.',
   'result.by_author': 'av {author}',
+  'result.add_description': 'Legg til skildring',
+  'result.description_placeholder': 'Skriv ein kort skildring av dette skannet...',
 
   // ColorDetailView
   'color.back': 'Tilbake',
@@ -157,6 +163,18 @@ const no: Record<string, string> = {
 
   // Palette modal
   'palette.pantone_connect': 'Pantone Connect',
+
+  // Boards
+  'boards.title': 'Tavler',
+  'boards.create': 'Opprett tavle',
+  'boards.name_placeholder': 'Namn på tavle...',
+  'boards.add_to_board': 'Legg til i tavle',
+  'boards.no_boards': 'Ingen tavler enno',
+  'boards.no_boards_hint': 'Lagre skanningar frå oppdage-sida!',
+  'boards.remove': 'Fjern',
+  'boards.public': 'Offentleg',
+  'boards.private': 'Privat',
+  'boards.description_placeholder': 'Legg til ei skildring...',
 
   // Error page
   'error.go_home': 'Gå heim',

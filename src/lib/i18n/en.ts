@@ -14,8 +14,8 @@ const en: Record<string, string> = {
   'scan.sign_in_desc': 'Create an account or sign in to start scanning materials and colors.',
   'scan.sign_in_button': 'Sign In / Sign Up',
   'scan.new_scan': 'New Scan',
-  'scan.salient': 'Salient',
-  'scan.help_text': 'Take a photo to identify NCS/RAL codes and material finishes instantly.',
+  'scan.salient': 'Key colors',
+  'scan.help_text': 'take a photo to identify NCS/RAL codes and material finishes instantly.',
   'scan.failed': 'Analysis failed. Please try again.',
 
   // PaletteTab
@@ -89,6 +89,10 @@ const en: Record<string, string> = {
   'profile.avatar_update_failed': 'Failed to update avatar',
   'profile.avatar_upload_failed': 'Failed to upload avatar',
   'profile.profile_update_failed': 'Failed to update profile',
+  'profile.bio': 'Bio',
+  'profile.bio_placeholder': 'Write a little about yourself...',
+  'profile.my_public_scans': 'My public scans',
+  'profile.no_public_scans_self': 'No published scans yet',
 
   // ResultView
   'result.edit_name': 'Edit product name',
@@ -98,6 +102,8 @@ const en: Record<string, string> = {
   'result.materials': 'Materials',
   'result.regeneration_failed': 'Regeneration failed.',
   'result.by_author': 'by {author}',
+  'result.add_description': 'Add description',
+  'result.description_placeholder': 'Write a short description of this scan...',
 
   // ColorDetailView
   'color.back': 'Back',
@@ -157,6 +163,18 @@ const en: Record<string, string> = {
 
   // Palette modal
   'palette.pantone_connect': 'Pantone Connect',
+
+  // Boards
+  'boards.title': 'Boards',
+  'boards.create': 'Create board',
+  'boards.name_placeholder': 'Board name...',
+  'boards.add_to_board': 'Save to board',
+  'boards.no_boards': 'No boards yet',
+  'boards.no_boards_hint': 'Save scans from the discover page!',
+  'boards.remove': 'Remove',
+  'boards.public': 'Public',
+  'boards.private': 'Private',
+  'boards.description_placeholder': 'Add a description...',
 
   // Error page
   'error.go_home': 'Go Home',

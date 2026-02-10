@@ -1,6 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import type { ScanRecord } from '$lib/scans';
 import type { SavedColor } from '$lib/saved-colors';
+import type { Board } from '$lib/boards';
 
 // Types
 export interface ColorMatch {
@@ -29,6 +30,7 @@ export interface Material {
 
 export interface AnalysisResult {
   productType: string;
+  description?: string;
   materials: Material[];
   colors: ColorMatch[];
 }
@@ -51,7 +53,7 @@ export type SortOption = 'trending' | 'newest' | 'most_liked';
 
 // App state stores
 export const activeTab = writable<Tab>('scan');
-export const historySubTab = writable<'scans' | 'colors'>('scans');
+export const historySubTab = writable<'scans' | 'colors' | 'boards'>('scans');
 
 // Data stores
 export const history = writable<HistoryItem[]>([]);
@@ -67,6 +69,8 @@ export const detailColor = writable<ColorMatch | null>(null);
 export const salientMode = writable(false);
 export const compareTarget = writable<ColorMatch | null>(null);
 export const selectedPaletteColor = writable<any | null>(null);
+export const boards = writable<Board[]>([]);
+export const boardSelectorScanId = writable<string | null>(null);
 
 // Helper function to check if a color is saved
 export function isColorSaved(color: ColorMatch): boolean {

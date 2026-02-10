@@ -331,10 +331,10 @@ export async function getPublicScansByUser(userId: string): Promise<ScanRecord[]
 /**
  * Fetch a user's profile by ID
  */
-export async function getProfileById(userId: string): Promise<{ id: string; display_name: string; avatar_url: string; created_at: string } | null> {
+export async function getProfileById(userId: string): Promise<{ id: string; display_name: string; avatar_url: string; bio: string | null; created_at: string } | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, display_name, avatar_url, created_at')
+    .select('id, display_name, avatar_url, bio, created_at')
     .eq('id', userId)
     .single();
 

@@ -1,7 +1,9 @@
 <script lang="ts">
   import { ChevronLeft, Share2, Heart, Hammer, RotateCcw, Palette, XCircle, Check, Copy } from 'lucide-svelte';
   import { user } from '$lib/stores/auth';
-  import { detailColor, history, communityItems, savedColorKeys, savedColors, compareTarget, MAX_SIMILAR_COLOR_DISTANCE } from '$lib/stores/app';
+  import { detailColor, detailItem, history, communityItems, savedColorKeys, savedColors, compareTarget, MAX_SIMILAR_COLOR_DISTANCE } from '$lib/stores/app';
+  import { updateScan } from '$lib/scans';
+  import { toasts } from '$lib/stores/toast';
   import { saveColor, unsaveColor } from '$lib/saved-colors';
   import { swipeGesture } from '$lib/actions/swipeGesture';
   import HueRing from '$lib/components/ncs/HueRing.svelte';
@@ -31,6 +33,7 @@
   let wheelColor = $state<NCSColor>({ hue: 0, blackness: 30, chromaticness: 40 });
   let swipeProgress = $state(0);
   let swipeReturning = $state(false);
+  let originalColorCode = $state<string | null>(null);
 
   // Curated comparison colors
   const CURATED_COMPARISONS: ColorMatch[] = [
@@ -55,6 +58,7 @@
   // Initialize wheel color when detail color changes
   $effect(() => {
     if ($detailColor) {
+      originalColorCode = $detailColor.code;
       initializeWheelColor();
       colorSaved = $savedColorKeys.has(`${$detailColor.system}:${$detailColor.code}`);
       // Auto-set compare target if available
@@ -100,25 +104,66 @@
     return rgbToHex(rgb.r, rgb.g, rgb.b);
   }
 
-  function confirmWheelColor() {
+  async function confirmWheelColor() {
     const hueStr = degreesToNcsHue(wheelColor.hue);
     const code = formatNcsCode(Math.round(wheelColor.blackness), Math.round(wheelColor.chromaticness), hueStr);
     const snapped = snapToNcsStandard(code);
-    if (snapped && $detailColor) {
-      const e = snapped.snapped;
-      detailColor.set({
-        ...$detailColor,
-        system: 'NCS',
-        code: e.code,
-        name: e.name,
-        hex: e.hex,
-        blackness: String(e.blackness),
-        chromaticness: String(e.chromaticness),
-        hue: e.hue,
-        lrv: String(e.lrv),
-        rgb: `${e.rgb.r},${e.rgb.g},${e.rgb.b}`,
-      });
+    if (!snapped || !$detailColor) return;
+
+    const e = snapped.snapped;
+    const oldCode = originalColorCode;
+    const newColor: ColorMatch = {
+      ...$detailColor,
+      system: 'NCS',
+      code: e.code,
+      name: e.name,
+      hex: e.hex,
+      blackness: String(e.blackness),
+      chromaticness: String(e.chromaticness),
+      hue: e.hue,
+      lrv: String(e.lrv),
+      rgb: `${e.rgb.r},${e.rgb.g},${e.rgb.b}`,
+    };
+
+    // Update the detail color in memory
+    detailColor.set(newColor);
+    originalColorCode = newColor.code;
+
+    // Update the parent scan's color array if there is one
+    if ($detailItem && oldCode) {
+      const newColors = $detailItem.result.colors.map(c =>
+        c.code === oldCode ? newColor : c
+      );
+      const newResult = { ...$detailItem.result, colors: newColors };
+      const updatedItem = { ...$detailItem, result: newResult };
+
+      detailItem.set(updatedItem);
+      history.update(items => items.map(item =>
+        item.id === updatedItem.id ? updatedItem : item
+      ));
+
+      // Persist to database
+      await updateScan(updatedItem.id, { result: newResult });
     }
+
+    // Auto-save the new color
+    if ($user) {
+      const key = `${newColor.system}:${newColor.code}`;
+      if (!$savedColorKeys.has(key)) {
+        const saved = await saveColor($user.id, {
+          system: newColor.system,
+          code: newColor.code,
+          name: newColor.name,
+          hex: newColor.hex,
+        });
+        if (saved) {
+          savedColors.update(colors => [saved, ...colors]);
+          savedColorKeys.update(keys => new Set([...keys, key]));
+          colorSaved = true;
+        }
+      }
+    }
+
     activeTab = 'details';
   }
 

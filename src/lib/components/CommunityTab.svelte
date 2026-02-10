@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Search, X, Globe, Layers, Heart, Flame, Clock, TrendingUp, ChevronDown, Grid3x3, LayoutGrid } from 'lucide-svelte';
+  import { Search, X, Globe, Layers, Heart, Flame, Clock, TrendingUp, ChevronDown, Grid3x3, LayoutGrid, Bookmark } from 'lucide-svelte';
   import { user } from '$lib/stores/auth';
-  import { communityItems, detailItem, detailColor, activeTab } from '$lib/stores/app';
+  import { communityItems, detailItem, detailColor, activeTab, boardSelectorScanId } from '$lib/stores/app';
   import { likeScan, unlikeScan } from '$lib/scans';
   import { t } from '$lib/i18n';
   import { goto } from '$app/navigation';
@@ -150,7 +150,7 @@
         </button>
       </div>
     {:else}
-      <h1 class="text-2xl font-bold tracking-tight">{$t('community.title')}</h1>
+      <h1 class="text-2xl font-bold tracking-tight mb-6 px-1">{$t('community.title')}</h1>
       <div class="flex items-center gap-2">
         <button
           onclick={() => paletteView = !paletteView}
@@ -286,17 +286,28 @@
                   ></button>
                 {/each}
               </div>
-              <button
-                onclick={(e) => { e.stopPropagation(); handleLike(item.id, item.isLiked ?? false); }}
-                class="flex items-center gap-1 text-xs transition-colors {item.isLiked
-                  ? 'text-red-500'
-                  : 'text-gray-400 hover:text-red-400'}"
-              >
-                <Heart size={14} fill={item.isLiked ? 'currentColor' : 'none'} />
-                {#if (item.likeCount ?? 0) > 0}
-                  <span>{item.likeCount}</span>
+              <div class="flex items-center gap-2">
+                {#if $user}
+                  <button
+                    onclick={(e) => { e.stopPropagation(); boardSelectorScanId.set(item.id); }}
+                    class="text-gray-400 hover:text-gray-600 transition-colors"
+                    title={$t('boards.add_to_board')}
+                  >
+                    <Bookmark size={14} />
+                  </button>
                 {/if}
-              </button>
+                <button
+                  onclick={(e) => { e.stopPropagation(); handleLike(item.id, item.isLiked ?? false); }}
+                  class="flex items-center gap-1 text-xs transition-colors {item.isLiked
+                    ? 'text-red-500'
+                    : 'text-gray-400 hover:text-red-400'}"
+                >
+                  <Heart size={14} fill={item.isLiked ? 'currentColor' : 'none'} />
+                  {#if (item.likeCount ?? 0) > 0}
+                    <span>{item.likeCount}</span>
+                  {/if}
+                </button>
+              </div>
             </div>
             {#if item.author}
               <button

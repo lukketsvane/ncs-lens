@@ -2,14 +2,16 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { ChevronLeft, Globe, Calendar } from 'lucide-svelte';
+  import { ChevronLeft, Globe, Calendar, FolderOpen } from 'lucide-svelte';
   import { getPublicScansByUser, getProfileById, type ScanRecord } from '$lib/scans';
+  import { getPublicBoardsByUser, type Board } from '$lib/boards';
   import { detailItem } from '$lib/stores/app';
   import { t } from '$lib/i18n';
   import type { HistoryItem } from '$lib/stores/app';
 
-  let profile = $state<{ id: string; display_name: string; avatar_url: string; created_at: string } | null>(null);
+  let profile = $state<{ id: string; display_name: string; avatar_url: string; bio: string | null; created_at: string } | null>(null);
   let scans = $state<HistoryItem[]>([]);
+  let publicBoards = $state<Board[]>([]);
   let loading = $state(true);
 
   onMount(async () => {
@@ -19,12 +21,14 @@
       return;
     }
 
-    const [profileData, scanData] = await Promise.all([
+    const [profileData, scanData, boardsData] = await Promise.all([
       getProfileById(userId),
       getPublicScansByUser(userId),
+      getPublicBoardsByUser(userId),
     ]);
 
     profile = profileData;
+    publicBoards = boardsData;
     scans = scanData.map((scan: ScanRecord) => ({
       id: scan.id,
       timestamp: new Date(scan.created_at).getTime(),
@@ -88,6 +92,9 @@
             {/if}
             <div>
               <h1 class="text-xl font-bold text-gray-900">{profile?.display_name || $t('profile.anonymous')}</h1>
+              {#if profile?.bio}
+                <p class="text-sm text-gray-600 mt-1">{profile.bio}</p>
+              {/if}
               {#if profile?.created_at}
                 <p class="text-sm text-gray-400 flex items-center gap-1 mt-1">
                   <Calendar size={12} />
@@ -129,6 +136,20 @@
                     {/each}
                   </div>
                 </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+
+        {#if publicBoards.length > 0}
+          <h2 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 mt-8 px-1">{$t('boards.title')}</h2>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {#each publicBoards as board (board.id)}
+              <div class="bg-white p-4 rounded-2xl border border-white">
+                <h3 class="font-bold text-gray-900 text-sm truncate">{board.name}</h3>
+                {#if board.description}
+                  <p class="text-xs text-gray-500 mt-1 truncate">{board.description}</p>
+                {/if}
               </div>
             {/each}
           </div>

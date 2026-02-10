@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { Camera, Palette, Layers, Globe, User } from 'lucide-svelte';
-  import { activeTab, detailItem, detailColor, selectedPaletteColor } from '$lib/stores/app';
+  import { activeTab, detailItem, detailColor, selectedPaletteColor, boardSelectorScanId } from '$lib/stores/app';
   import { initAuth } from '$lib/stores/auth';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
@@ -10,6 +10,7 @@
   import ResultView from '$lib/components/ResultView.svelte';
   import ColorDetailView from '$lib/components/ColorDetailView.svelte';
   import PaletteColorModal from '$lib/components/PaletteColorModal.svelte';
+  import BoardSelector from '$lib/components/BoardSelector.svelte';
 
   let { children } = $props();
 
@@ -37,6 +38,10 @@
 
   {#if $detailColor}
     <ColorDetailView />
+  {/if}
+
+  {#if $boardSelectorScanId}
+    <BoardSelector scanId={$boardSelectorScanId} onclose={() => boardSelectorScanId.set(null)} />
   {/if}
 
   <!-- Bottom Navigation -->
