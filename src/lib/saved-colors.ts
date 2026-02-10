@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 export interface SavedColor {
   id: string;
   user_id: string;
-  color_system: 'NCS' | 'RAL';
+  color_system: 'NCS' | 'RAL' | 'Pantone';
   color_code: string;
   color_name: string | null;
   color_hex: string;
@@ -35,7 +35,7 @@ export async function getSavedColors(userId: string): Promise<SavedColor[]> {
 export async function saveColor(
   userId: string,
   color: {
-    system: 'NCS' | 'RAL';
+    system: 'NCS' | 'RAL' | 'Pantone';
     code: string;
     name?: string;
     hex: string;
@@ -69,7 +69,7 @@ export async function saveColor(
 /**
  * Remove a saved color
  */
-export async function unsaveColor(userId: string, colorSystem: 'NCS' | 'RAL', colorCode: string): Promise<boolean> {
+export async function unsaveColor(userId: string, colorSystem: 'NCS' | 'RAL' | 'Pantone', colorCode: string): Promise<boolean> {
   const { error } = await supabase
     .from('saved_colors')
     .delete()
@@ -88,7 +88,7 @@ export async function unsaveColor(userId: string, colorSystem: 'NCS' | 'RAL', co
 /**
  * Check if a color is saved
  */
-export async function isColorSaved(userId: string, colorSystem: 'NCS' | 'RAL', colorCode: string): Promise<boolean> {
+export async function isColorSaved(userId: string, colorSystem: 'NCS' | 'RAL' | 'Pantone', colorCode: string): Promise<boolean> {
   const { data, error } = await supabase
     .from('saved_colors')
     .select('id')

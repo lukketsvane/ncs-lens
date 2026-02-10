@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { Layers, Heart, Trash2, FolderOpen, Loader2, Globe, Lock, Trash } from 'lucide-svelte';
+  import { Layers, Heart, Trash2, FolderOpen, Loader2, Globe, Lock, Trash, Plus } from 'lucide-svelte';
   import { user } from '$lib/stores/auth';
   import { history, historySubTab, savedColors, detailItem, detailColor, boards } from '$lib/stores/app';
   import { deleteScan } from '$lib/scans';
   import { deleteImage } from '$lib/storage';
-  import { getUserBoards, getBoardItems, deleteBoard, type Board } from '$lib/boards';
+  import { getUserBoards, getBoardItems, deleteBoard, createBoard, type Board } from '$lib/boards';
   import { t } from '$lib/i18n';
   import type { HistoryItem, ColorMatch } from '$lib/stores/app';
 
@@ -12,6 +12,8 @@
   let selectedBoard = $state<Board | null>(null);
   let boardScans = $state<HistoryItem[]>([]);
   let boardScansLoading = $state(false);
+  let newBoardName = $state('');
+  let creatingBoard = $state(false);
 
   async function loadBoards() {
     if (!$user) return;
@@ -38,8 +40,19 @@
     }
   }
 
+  async function handleCreateBoard() {
+    if (!$user || !newBoardName.trim()) return;
+    creatingBoard = true;
+    const board = await createBoard($user.id, newBoardName.trim());
+    if (board) {
+      boards.update(b => [board, ...b]);
+      newBoardName = '';
+    }
+    creatingBoard = false;
+  }
+
   $effect(() => {
-    if ($historySubTab === 'boards' && $boards.length === 0) {
+    if ($historySubTab === 'boards') {
       loadBoards();
     }
   });
@@ -197,6 +210,28 @@
     </div>
   {:else if $historySubTab === 'boards'}
     <div class="px-4">
+      <!-- Create board -->
+      <div class="flex gap-2 mb-4">
+        <input
+          type="text"
+          bind:value={newBoardName}
+          placeholder={$t('boards.name_placeholder')}
+          class="flex-1 px-4 py-2.5 bg-white rounded-xl text-sm font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10"
+          onkeydown={(e) => { if (e.key === 'Enter') handleCreateBoard(); }}
+        />
+        <button
+          onclick={handleCreateBoard}
+          disabled={creatingBoard || !newBoardName.trim()}
+          class="px-4 py-2.5 bg-gray-900 text-white rounded-xl font-semibold text-sm hover:bg-black transition-colors disabled:opacity-50 flex items-center gap-2"
+        >
+          {#if creatingBoard}
+            <Loader2 size={16} class="animate-spin" />
+          {:else}
+            <Plus size={16} />
+          {/if}
+        </button>
+      </div>
+
       {#if boardsLoading}
         <div class="flex items-center justify-center h-[50vh]">
           <Loader2 size={32} class="animate-spin text-gray-400" />

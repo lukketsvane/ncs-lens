@@ -34,7 +34,7 @@
     if (!$user || !$selectedPaletteColor) return;
     const key = `Pantone:${$selectedPaletteColor.pantone.code}`;
     if ($savedColorKeys.has(key)) {
-      const success = await unsaveColor($user.id, 'NCS' as any, $selectedPaletteColor.pantone.code);
+      const success = await unsaveColor($user.id, 'Pantone', $selectedPaletteColor.pantone.code);
       if (success) {
         savedColors.update(colors => colors.filter(c => !(c.color_code === $selectedPaletteColor!.pantone.code)));
         savedColorKeys.update(keys => { const next = new Set(keys); next.delete(key); return next; });
@@ -42,7 +42,7 @@
       }
     } else {
       const saved = await saveColor($user.id, {
-        system: 'NCS' as any,
+        system: 'Pantone',
         code: $selectedPaletteColor.pantone.code,
         name: $selectedPaletteColor.pantone.name,
         hex: $selectedPaletteColor.pantone.hex,

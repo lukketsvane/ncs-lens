@@ -129,10 +129,10 @@
   }
 </script>
 
-<div class="min-h-full p-4 pt-8 pb-24 safe-area-top">
-  <div class="flex items-center justify-between mb-4 px-1">
+<div class="min-h-full pb-24 safe-area-top">
+  <div class="p-4 pb-0">
     {#if showSearch}
-      <div class="flex-1 flex items-center gap-2">
+      <div class="flex items-center gap-2 px-1 mb-4">
         <div class="flex-1 relative">
           <Search size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -150,7 +150,8 @@
         </button>
       </div>
     {:else}
-      <h1 class="text-2xl font-bold tracking-tight mb-6 px-1">{$t('community.title')}</h1>
+      <div class="flex items-center justify-between mb-4 px-1">
+        <h1 class="text-2xl font-bold tracking-tight">{$t('community.title')}</h1>
       <div class="flex items-center gap-2">
         <button
           onclick={() => paletteView = !paletteView}
@@ -170,11 +171,12 @@
           <Search size={20} class="text-gray-400" />
         </button>
       </div>
+      </div>
     {/if}
   </div>
 
   {#if !showSearch}
-    <div class="mb-4 px-1 relative">
+    <div class="mb-4 px-5 relative">
       <button
         onclick={() => showSortMenu = !showSortMenu}
         class="flex items-center gap-2 px-3 py-2 bg-white rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -214,6 +216,7 @@
     </div>
   {/if}
 
+  <div class="px-4">
   {#if filteredAndSortedItems.length === 0}
     <div class="flex flex-col items-center justify-center h-[50vh] text-gray-400">
       {#if searchQuery}
@@ -322,4 +325,5 @@
       {/each}
     </div>
   {/if}
+  </div>
 </div>

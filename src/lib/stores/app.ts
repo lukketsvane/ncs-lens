@@ -5,7 +5,7 @@ import type { Board } from '$lib/boards';
 
 // Types
 export interface ColorMatch {
-  system: "RAL" | "NCS";
+  system: "RAL" | "NCS" | "Pantone";
   code: string;
   name: string;
   hex: string;

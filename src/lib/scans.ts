@@ -6,13 +6,14 @@ export interface ScanRecord {
   image_url: string;
   result: {
     productType: string;
+    description?: string;
     materials: Array<{
       name: string;
       texture: string;
       finish: string;
     }>;
     colors: Array<{
-      system: 'RAL' | 'NCS';
+      system: 'RAL' | 'NCS' | 'Pantone';
       code: string;
       name: string;
       hex: string;
@@ -32,7 +33,7 @@ export interface ScanRecord {
   is_public: boolean;
   created_at: string;
   updated_at: string | null;
-  author?: string; // Added for display purposes
+  author?: string;
 }
 
 /**
