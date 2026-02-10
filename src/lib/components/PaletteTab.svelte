@@ -140,15 +140,15 @@
 </script>
 
 <div
-  class="min-h-full pb-24 safe-area-top p-4 lg:p-8"
+  class="min-h-full pb-24 safe-area-top"
   ondragover={handleDragOver}
   ondragleave={handleDragLeave}
   ondrop={handleDrop}
 >
-  <div class="w-full max-w-[900px] mx-auto flex flex-col gap-6">
-
-    <!-- Page Title -->
+  <div class="p-4">
     <h1 class="text-2xl font-bold tracking-tight mb-6 px-1">{$t('palette.title')}</h1>
+  </div>
+  <div class="w-full max-w-[900px] mx-auto flex flex-col gap-6 px-4 lg:px-8">
 
     <!-- Main Card -->
     <div class="bg-white rounded-[2.5rem] overflow-hidden ring-1 ring-slate-900/5 min-h-[600px] flex flex-col relative">
