@@ -4,6 +4,7 @@
   import { communityItems, detailItem, detailColor, activeTab } from '$lib/stores/app';
   import { likeScan, unlikeScan } from '$lib/scans';
   import { t } from '$lib/i18n';
+  import { goto } from '$app/navigation';
   import type { HistoryItem, ColorMatch, SortOption } from '$lib/stores/app';
 
   let searchQuery = $state('');
@@ -298,7 +299,12 @@
               </button>
             </div>
             {#if item.author}
-              <p class="text-[10px] text-gray-400 mt-2">{$t('result.by_author', { author: item.author })}</p>
+              <button
+                onclick={(e) => { e.stopPropagation(); if (item.userId) goto(`/user/${item.userId}`); }}
+                class="text-[10px] text-gray-400 mt-2 hover:text-gray-600 hover:underline transition-colors text-left"
+              >
+                {$t('result.by_author', { author: item.author })}
+              </button>
             {/if}
           </div>
         </div>

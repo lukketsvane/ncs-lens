@@ -1,12 +1,14 @@
 <script lang="ts">
   import '../app.css';
   import { Camera, Palette, Layers, Globe, User } from 'lucide-svelte';
-  import { activeTab } from '$lib/stores/app';
+  import { activeTab, detailItem, detailColor } from '$lib/stores/app';
   import { initAuth } from '$lib/stores/auth';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { t } from '$lib/i18n';
   import Toast from '$lib/components/Toast.svelte';
+  import ResultView from '$lib/components/ResultView.svelte';
+  import ColorDetailView from '$lib/components/ColorDetailView.svelte';
 
   let { children } = $props();
 
@@ -22,6 +24,15 @@
   <main class="h-full">
     {@render children()}
   </main>
+
+  <!-- Global Overlays (accessible from all routes) -->
+  {#if $detailItem}
+    <ResultView />
+  {/if}
+
+  {#if $detailColor}
+    <ColorDetailView />
+  {/if}
 
   <!-- Bottom Navigation -->
   {#if showNav}

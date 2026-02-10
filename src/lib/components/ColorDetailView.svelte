@@ -1,13 +1,18 @@
 <script lang="ts">
-  import { ChevronLeft, Share2, Heart, Hammer, RotateCcw, Palette, XCircle } from 'lucide-svelte';
+  import { ChevronLeft, Share2, Heart, Hammer, RotateCcw, Palette, XCircle, Check } from 'lucide-svelte';
   import { user } from '$lib/stores/auth';
-  import { detailColor, history, communityItems, savedColorKeys, savedColors, MAX_SIMILAR_COLOR_DISTANCE } from '$lib/stores/app';
+  import { detailColor, history, communityItems, savedColorKeys, savedColors, compareTarget, MAX_SIMILAR_COLOR_DISTANCE } from '$lib/stores/app';
   import { saveColor, unsaveColor } from '$lib/saved-colors';
   import { swipeGesture } from '$lib/actions/swipeGesture';
   import HueRing from '$lib/components/ncs/HueRing.svelte';
   import TrianglePicker from '$lib/components/ncs/TrianglePicker.svelte';
-  import { degreesToNcsHue, ncsToCss, type NCSColor } from '$lib/components/ncs/utils';
-  import { hexToRgb, rgbToLab, deltaE2000 } from '$lib/ncs-colors';
+  import { degreesToNcsHue, type NCSColor } from '$lib/components/ncs/utils';
+  import {
+    hexToRgb, rgbToLab, deltaE2000, rgbToHex,
+    parseNcsCode, ncsHueToDegrees as ncsHueToDegreesLib,
+    ncsToRgb, findNearestNcsColor, formatNcsCode,
+    snapToNcsStandard, getNcsColorByCode
+  } from '$lib/ncs-colors';
   import { t } from '$lib/i18n';
   import type { ColorMatch, HistoryItem } from '$lib/stores/app';
 
@@ -24,6 +29,8 @@
   let showSimilarColors = $state(false);
   let colorSaved = $state(false);
   let wheelColor = $state<NCSColor>({ hue: 0, blackness: 30, chromaticness: 40 });
+  let swipeProgress = $state(0);
+  let swipeReturning = $state(false);
 
   // Curated comparison colors
   const CURATED_COMPARISONS: ColorMatch[] = [
@@ -50,111 +57,69 @@
     if ($detailColor) {
       initializeWheelColor();
       colorSaved = $savedColorKeys.has(`${$detailColor.system}:${$detailColor.code}`);
+      // Auto-set compare target if available
+      if ($compareTarget) {
+        compareColor = $compareTarget;
+        compareTarget.set(null);
+        if (activeTab !== 'compare') activeTab = 'compare';
+      }
     }
   });
 
   function initializeWheelColor() {
     if (!$detailColor) return;
-    const parsed = parseNCSStr($detailColor.code);
-    if (parsed && $detailColor.system === 'NCS') {
-      const hueValue = ncsHueToDegrees(parsed.hue);
-      const blacknessValue = parseInt(parsed.blackness, 10) || 30;
-      const chromaticnessValue = parseInt(parsed.chroma, 10) || 40;
-      wheelColor = { hue: hueValue, blackness: blacknessValue, chromaticness: chromaticnessValue };
-    } else {
-      wheelColor = hexToNcsApprox($detailColor.hex);
-    }
-  }
-
-  function parseNCSStr(code: string) {
-    const match = code.match(/S?\s*(\d{2})(\d{2})-(.*)/i);
-    if (match) {
-      return { blackness: match[1], chroma: match[2], hue: match[3] };
-    }
-    return null;
-  }
-
-  function ncsHueToDegrees(hueStr: string): number {
-    if (!hueStr) return 0;
-    const h = hueStr.toUpperCase().trim();
-    if (h === 'Y') return 0;
-    if (h === 'R') return 90;
-    if (h === 'B') return 180;
-    if (h === 'G') return 270;
-    if (h === 'N') return 0;
-    const match = h.match(/([YRBG])(\d+)([YRBG])/);
-    if (match) {
-      const from = match[1];
-      const percent = parseInt(match[2], 10);
-      const baseAngles: Record<string, number> = { Y: 0, R: 90, B: 180, G: 270 };
-      const base = baseAngles[from] ?? 0;
-      return (base + (percent / 100) * 90) % 360;
-    }
-    return 0;
-  }
-
-  function hexToNcsApprox(hex: string): NCSColor {
-    if (!hex || !/^#[0-9A-Fa-f]{6}$/.test(hex)) {
-      return { hue: 0, blackness: 30, chromaticness: 40 };
-    }
-    const r = parseInt(hex.slice(1, 3), 16) / 255;
-    const g = parseInt(hex.slice(3, 5), 16) / 255;
-    const b = parseInt(hex.slice(5, 7), 16) / 255;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const l = (max + min) / 2;
-    let h = 0, s = 0;
-    if (max !== min) {
-      const d = max - min;
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-      switch (max) {
-        case r: h = ((g - b) / d + (g < b ? 6 : 0)) * 60; break;
-        case g: h = ((b - r) / d + 2) * 60; break;
-        case b: h = ((r - g) / d + 4) * 60; break;
+    if ($detailColor.system === 'NCS') {
+      const parsed = parseNcsCode($detailColor.code);
+      if (parsed) {
+        wheelColor = {
+          hue: ncsHueToDegreesLib(parsed.hue),
+          blackness: parsed.blackness,
+          chromaticness: parsed.chromaticness
+        };
+        return;
       }
     }
-    let ncsHue = 0;
-    if (h <= 60) ncsHue = (60 - h) / 60 * 90;
-    else if (h <= 120) ncsHue = 270 + (120 - h) / 60 * 90;
-    else if (h <= 240) ncsHue = 180 - (h - 120) / 120 * 90;
-    else ncsHue = 180 + (360 - h) / 120 * 90;
-    return {
-      hue: Math.round(ncsHue) % 360,
-      blackness: Math.min(100, Math.max(0, Math.round((1 - l) * 100))),
-      chromaticness: Math.min(100, Math.max(0, Math.round(s * 100)))
-    };
+    // Fallback: find nearest NCS color from hex
+    const nearest = findNearestNcsColor($detailColor.hex, 1);
+    if (nearest.length > 0) {
+      const e = nearest[0].color;
+      wheelColor = {
+        hue: ncsHueToDegreesLib(e.hue),
+        blackness: e.blackness,
+        chromaticness: e.chromaticness
+      };
+    } else {
+      wheelColor = { hue: 0, blackness: 30, chromaticness: 40 };
+    }
   }
 
-  function ncsToHex(color: NCSColor): string {
-    const hslStr = ncsToCss(color);
-    const match = hslStr.match(/hsl\(([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\)/);
-    if (!match) return '#888888';
-    const h = parseFloat(match[1]) / 360;
-    const s = parseFloat(match[2]) / 100;
-    const l = parseFloat(match[3]) / 100;
-    let r: number, g: number, b: number;
-    if (s === 0) {
-      r = g = b = l;
-    } else {
-      const hue2rgb = (p: number, q: number, t: number) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-        return p;
-      };
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1/3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1/3);
+  function ncsWheelToHex(color: NCSColor): string {
+    const hueStr = degreesToNcsHue(color.hue);
+    const isNeutral = hueStr === 'N' || color.chromaticness === 0;
+    const rgb = ncsToRgb(color.blackness, color.chromaticness, color.hue, isNeutral);
+    return rgbToHex(rgb.r, rgb.g, rgb.b);
+  }
+
+  function confirmWheelColor() {
+    const hueStr = degreesToNcsHue(wheelColor.hue);
+    const code = formatNcsCode(Math.round(wheelColor.blackness), Math.round(wheelColor.chromaticness), hueStr);
+    const snapped = snapToNcsStandard(code);
+    if (snapped && $detailColor) {
+      const e = snapped.snapped;
+      detailColor.set({
+        ...$detailColor,
+        system: 'NCS',
+        code: e.code,
+        name: e.name,
+        hex: e.hex,
+        blackness: String(e.blackness),
+        chromaticness: String(e.chromaticness),
+        hue: e.hue,
+        lrv: String(e.lrv),
+        rgb: `${e.rgb.r},${e.rgb.g},${e.rgb.b}`,
+      });
     }
-    const toHex = (x: number) => {
-      const hex = Math.round(x * 255).toString(16);
-      return hex.length === 1 ? '0' + hex : hex;
-    };
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    activeTab = 'details';
   }
 
   function getContrastColor(hex: string): string {
@@ -210,19 +175,56 @@
   // Derived values
   const isNCS = $derived($detailColor?.system === 'NCS');
   const isWheelTabActive = $derived(activeTab === 'wheel');
-  const displayHex = $derived(isWheelTabActive ? ncsToHex(wheelColor) : ($detailColor?.hex ?? '#888888'));
+  const displayHex = $derived(isWheelTabActive ? ncsWheelToHex(wheelColor) : ($detailColor?.hex ?? '#888888'));
   const contrastText = $derived(getContrastColor(displayHex));
   const formatNcsValue = (value: number): string => String(Math.round(value)).padStart(2, '0');
 
-  const blackness = $derived(isWheelTabActive
-    ? formatNcsValue(wheelColor.blackness)
-    : ($detailColor?.blackness || parseNCSStr($detailColor?.code ?? '')?.blackness || "--"));
-  const chroma = $derived(isWheelTabActive
-    ? formatNcsValue(wheelColor.chromaticness)
-    : ($detailColor?.chromaticness || parseNCSStr($detailColor?.code ?? '')?.chroma || "--"));
-  const hue = $derived(isWheelTabActive
-    ? degreesToNcsHue(wheelColor.hue)
-    : ($detailColor?.hue || parseNCSStr($detailColor?.code ?? '')?.hue || ""));
+  // NCS database fallback for missing data
+  const ncsEntry = $derived($detailColor?.system === 'NCS' ? getNcsColorByCode($detailColor.code) : null);
+
+  const displayLrv = $derived($detailColor?.lrv || (ncsEntry ? String(ncsEntry.lrv) : 'N/A'));
+  const displayRgb = $derived($detailColor?.rgb || (ncsEntry ? `${ncsEntry.rgb.r},${ncsEntry.rgb.g},${ncsEntry.rgb.b}` : 'N/A'));
+
+  const blackness = $derived.by(() => {
+    if (isWheelTabActive) return formatNcsValue(wheelColor.blackness);
+    if ($detailColor?.blackness) return $detailColor.blackness;
+    const parsed = $detailColor ? parseNcsCode($detailColor.code) : null;
+    return parsed ? String(parsed.blackness).padStart(2, '0') : '--';
+  });
+  const chroma = $derived.by(() => {
+    if (isWheelTabActive) return formatNcsValue(wheelColor.chromaticness);
+    if ($detailColor?.chromaticness) return $detailColor.chromaticness;
+    const parsed = $detailColor ? parseNcsCode($detailColor.code) : null;
+    return parsed ? String(parsed.chromaticness).padStart(2, '0') : '--';
+  });
+  const hue = $derived.by(() => {
+    if (isWheelTabActive) return degreesToNcsHue(wheelColor.hue);
+    if ($detailColor?.hue) return $detailColor.hue;
+    const parsed = $detailColor ? parseNcsCode($detailColor.code) : null;
+    return parsed ? parsed.hue : '';
+  });
+
+  // Compare deltaE
+  const compareDeltaE = $derived.by(() => {
+    if (!compareColor || !$detailColor) return null;
+    return calculateColorDistance($detailColor.hex, compareColor.hex);
+  });
+
+  // Saved colors as comparison targets
+  const savedCompareColors = $derived.by(() => {
+    if (!$detailColor) return [];
+    return $savedColors
+      .filter(c => c.color_code !== $detailColor.code)
+      .map(c => ({
+        system: c.color_system as "RAL" | "NCS",
+        code: c.color_code,
+        name: c.color_name || c.color_code,
+        hex: c.color_hex,
+        location: '-', confidence: 'High',
+        materialGuess: '-', finishGuess: '-', laymanDescription: '-',
+      } satisfies ColorMatch))
+      .slice(0, 12);
+  });
 
   const similarColors = $derived.by(() => {
     if (!$detailColor) return [];
@@ -270,12 +272,24 @@
   function resetWheel() {
     initializeWheelColor();
   }
+
+  const hasMaterialData = $derived(
+    $detailColor?.materialGuess && $detailColor.materialGuess !== '-' && $detailColor.materialGuess !== ''
+  );
 </script>
 
 {#if $detailColor}
   <div
     class="fixed inset-0 z-[60] bg-white flex flex-col animate-in slide-in-from-bottom duration-300"
-    use:swipeGesture={{ onSwipeRight: handleBack, threshold: 50, edgeThreshold: 40 }}
+    class:swipe-returning={swipeReturning}
+    style="transform: translateX({swipeProgress * 100}px); opacity: {1 - swipeProgress * 0.3}"
+    use:swipeGesture={{
+      onSwipeRight: handleBack,
+      threshold: 50,
+      edgeThreshold: 40,
+      onProgress: (p) => { swipeReturning = false; swipeProgress = p; },
+      onCancel: () => { swipeReturning = true; swipeProgress = 0; }
+    }}
   >
     <!-- Top Section -->
     <div
@@ -388,7 +402,7 @@
           </div>
           <div class="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
             <span class="text-gray-500 text-sm">{$t('color.lrv')}</span>
-            <span class="text-gray-900 font-mono font-medium">{$detailColor.lrv || "N/A"}</span>
+            <span class="text-gray-900 font-mono font-medium">{displayLrv}</span>
           </div>
           <div class="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
             <span class="text-gray-500 text-sm">{$t('color.cmyk')}</span>
@@ -396,26 +410,34 @@
           </div>
           <div class="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
             <span class="text-gray-500 text-sm">{$t('color.rgb')}</span>
-            <span class="text-gray-900 font-mono font-medium">{$detailColor.rgb || "N/A"}</span>
+            <span class="text-gray-900 font-mono font-medium">{displayRgb}</span>
           </div>
         </div>
       {:else if activeTab === 'combinations'}
         <div class="p-6 space-y-8 animate-in fade-in">
-          <div class="space-y-4">
-            <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wide">{$t('color.material_id')}</h3>
-            <div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex items-start gap-4">
-              <div class="bg-white p-3 rounded-full">
-                <Hammer class="text-gray-700" size={24} />
-              </div>
-              <div>
-                <div class="font-bold text-gray-900 text-lg">{$detailColor.materialGuess}</div>
-                <div class="text-gray-500 text-sm mt-1">{$detailColor.finishGuess}</div>
-                <p class="text-gray-600 text-sm mt-3 leading-relaxed">
-                  {$detailColor.laymanDescription}
-                </p>
+          {#if hasMaterialData}
+            <div class="space-y-4">
+              <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wide">{$t('color.material_id')}</h3>
+              <div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex items-start gap-4">
+                <div class="bg-white p-3 rounded-full">
+                  <Hammer class="text-gray-700" size={24} />
+                </div>
+                <div>
+                  <div class="font-bold text-gray-900 text-lg">{$detailColor.materialGuess}</div>
+                  <div class="text-gray-500 text-sm mt-1">{$detailColor.finishGuess}</div>
+                  <p class="text-gray-600 text-sm mt-3 leading-relaxed">
+                    {$detailColor.laymanDescription}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          {:else}
+            <div class="text-center py-12 text-gray-400">
+              <Hammer size={48} class="mx-auto mb-4 opacity-20" />
+              <p>{$t('color.no_context')}</p>
+              <p class="text-sm mt-1">{$t('color.no_context_hint')}</p>
+            </div>
+          {/if}
         </div>
       {:else if activeTab === 'compare'}
         <div class="h-full flex flex-col animate-in fade-in">
@@ -436,8 +458,11 @@
                 <p class="text-sm font-medium opacity-70 uppercase tracking-widest">{getCuratedName(compareColor.name)}</p>
               </div>
 
-              <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-white text-black font-bold text-xs px-3 py-1 rounded-full border border-gray-100 z-30">
+              <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-white text-black font-bold text-xs px-3 py-1 rounded-full border border-gray-100 z-30 flex items-center gap-2">
                 {$t('color.vs')}
+                {#if compareDeltaE !== null}
+                  <span class="text-gray-500 font-normal">{$t('color.delta_e')}: {compareDeltaE.toFixed(1)}</span>
+                {/if}
               </div>
             </div>
           {:else}
@@ -456,6 +481,23 @@
                   {/each}
                 </div>
               </div>
+
+              {#if savedCompareColors.length > 0}
+                <div>
+                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">{$t('color.saved_colors_section')}</h3>
+                  <div class="grid grid-cols-4 gap-4">
+                    {#each savedCompareColors as c}
+                      <button
+                        onclick={() => compareColor = c}
+                        class="flex flex-col items-center gap-2 group"
+                      >
+                        <div class="w-full aspect-square rounded-2xl border border-gray-200 group-hover:scale-105 transition-transform" style="background-color: {c.hex}"></div>
+                        <span class="text-[10px] font-medium text-gray-600 w-full truncate text-center">{c.code.split(" ").pop()}</span>
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
 
               <div>
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">{$t('color.recent_scans')}</h3>
@@ -495,10 +537,17 @@
             </div>
           </div>
 
-          <div class="p-4 bg-white border-t border-gray-100">
+          <div class="p-4 bg-white border-t border-gray-100 flex gap-3">
+            <button
+              onclick={confirmWheelColor}
+              class="flex-1 py-3 px-4 bg-gray-900 text-white font-semibold rounded-2xl hover:bg-black transition-colors flex items-center justify-center gap-2"
+            >
+              <Check size={16} />
+              {$t('color.confirm')}
+            </button>
             <button
               onclick={resetWheel}
-              class="w-full py-3 px-4 bg-gray-100 text-gray-700 font-semibold rounded-2xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+              class="py-3 px-4 bg-gray-100 text-gray-700 font-semibold rounded-2xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
             >
               <RotateCcw size={16} />
               {$t('color.reset')}

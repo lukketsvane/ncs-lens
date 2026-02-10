@@ -308,3 +308,40 @@ export async function getLikesInfo(scanIds: string[], userId?: string): Promise<
 
   return result;
 }
+
+/**
+ * Fetch public scans by a specific user
+ */
+export async function getPublicScansByUser(userId: string): Promise<ScanRecord[]> {
+  const { data, error } = await supabase
+    .from('scans')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_public', true)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching user public scans:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Fetch a user's profile by ID
+ */
+export async function getProfileById(userId: string): Promise<{ id: string; display_name: string; avatar_url: string; created_at: string } | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url, created_at')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching profile:', error);
+    return null;
+  }
+
+  return data;
+}

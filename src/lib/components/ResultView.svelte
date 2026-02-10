@@ -1,18 +1,22 @@
 <script lang="ts">
-  import { ChevronLeft, RotateCcw, Globe, Lock, Loader2, RefreshCw, Pencil, Check, ArrowRight } from 'lucide-svelte';
+  import { ChevronLeft, RotateCcw, Globe, Lock, Loader2, RefreshCw, Pencil, Check, ArrowRight, Heart } from 'lucide-svelte';
   import { user } from '$lib/stores/auth';
-  import { detailItem, detailColor, history, communityItems, loading, salientMode } from '$lib/stores/app';
+  import { detailItem, detailColor, history, communityItems, loading, salientMode, savedColorKeys, savedColors } from '$lib/stores/app';
   import { publishScan, unpublishScan, updateScan } from '$lib/scans';
+  import { saveColor, unsaveColor } from '$lib/saved-colors';
   import { analyzeImage } from '$lib/api';
   import { swipeGesture } from '$lib/actions/swipeGesture';
   import { toasts } from '$lib/stores/toast';
   import { t } from '$lib/i18n';
   import type { ColorMatch, AnalysisResult } from '$lib/stores/app';
+  import { goto } from '$app/navigation';
 
   let isPublishing = $state(false);
   let isUnpublishing = $state(false);
   let isPublic = $state($detailItem?.isPublic ?? false);
   let editingProductType = $state(false);
+  let swipeProgress = $state(0);
+  let swipeReturning = $state(false);
   let editedProductType = $state($detailItem?.result.productType ?? '');
 
   $effect(() => {
@@ -104,10 +108,46 @@
   }
 
   function selectColor(color: ColorMatch) { detailColor.set(color); }
+
+  async function toggleSaveColor(color: ColorMatch, e: MouseEvent) {
+    e.stopPropagation();
+    if (!$user) return;
+    const key = `${color.system}:${color.code}`;
+    if ($savedColorKeys.has(key)) {
+      const success = await unsaveColor($user.id, color.system, color.code);
+      if (success) {
+        savedColors.update(colors => colors.filter(c => !(c.color_system === color.system && c.color_code === color.code)));
+        savedColorKeys.update(keys => { const next = new Set(keys); next.delete(key); return next; });
+      }
+    } else {
+      const saved = await saveColor($user.id, { system: color.system, code: color.code, name: color.name, hex: color.hex });
+      if (saved) {
+        savedColors.update(colors => [saved, ...colors]);
+        savedColorKeys.update(keys => new Set([...keys, key]));
+      }
+    }
+  }
+
+  function navigateToAuthor() {
+    if ($detailItem?.userId) {
+      goto(`/user/${$detailItem.userId}`);
+    }
+  }
 </script>
 
 {#if $detailItem}
-  <div class="fixed inset-0 bg-[#F0F2F5] z-40 overflow-y-auto no-scrollbar safe-area-top safe-area-bottom" use:swipeGesture={{ onSwipeRight: handleBack, threshold: 50, edgeThreshold: 40 }}>
+  <div
+    class="fixed inset-0 bg-[#F0F2F5] z-40 overflow-y-auto no-scrollbar safe-area-top safe-area-bottom"
+    class:swipe-returning={swipeReturning}
+    style="transform: translateX({swipeProgress * 100}px); opacity: {1 - swipeProgress * 0.3}"
+    use:swipeGesture={{
+      onSwipeRight: handleBack,
+      threshold: 50,
+      edgeThreshold: 40,
+      onProgress: (p) => { swipeReturning = false; swipeProgress = p; },
+      onCancel: () => { swipeReturning = true; swipeProgress = 0; }
+    }}
+  >
     <div class="p-4 min-h-full pb-20">
       <div class="flex justify-between items-center mb-6">
         <button onclick={handleBack} class="p-2 bg-white rounded-full hover:bg-gray-100"><ChevronLeft size={20} /></button>
@@ -145,7 +185,12 @@
             </button>
           {/if}
           {#if $detailItem.author}
-            <div class="absolute bottom-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-medium text-white">{$t('result.by_author', { author: $detailItem.author })}</div>
+            <button
+              onclick={(e) => { e.stopPropagation(); navigateToAuthor(); }}
+              class="absolute bottom-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-medium text-white hover:bg-black/70 transition-colors"
+            >
+              {$t('result.by_author', { author: $detailItem.author })}
+            </button>
           {/if}
         </div>
 
@@ -168,6 +213,11 @@
               <div class="flex justify-between items-start {textColorClass} opacity-80">
                 <span class="text-[10px] font-bold tracking-widest uppercase bg-black/10 backdrop-blur-sm px-2 py-1 rounded-lg border border-white/10">{color.system}</span>
                 <div class="flex items-center gap-2">
+                  {#if $user}
+                    <button onclick={(e) => toggleSaveColor(color, e)} class="p-1.5 rounded-full hover:bg-black/10 transition-colors">
+                      <Heart size={14} fill={$savedColorKeys.has(`${color.system}:${color.code}`) ? 'currentColor' : 'none'} class={$savedColorKeys.has(`${color.system}:${color.code}`) ? 'text-red-500' : ''} />
+                    </button>
+                  {/if}
                   {#if isOwner}
                     <button onclick={(e) => { e.stopPropagation(); handleRegenerate(); }} class="p-1.5 rounded-full hover:bg-black/10 transition-colors">
                       <RefreshCw size={14} class={textColorClass === 'text-black' ? 'text-black/60' : 'text-white/80'} />

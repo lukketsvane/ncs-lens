@@ -43,3 +43,8 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Swipe gesture return animation */
+.swipe-returning {
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}

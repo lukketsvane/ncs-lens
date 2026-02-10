@@ -11,8 +11,6 @@
   import HistoryTab from '$lib/components/HistoryTab.svelte';
   import CommunityTab from '$lib/components/CommunityTab.svelte';
   import ProfileTab from '$lib/components/ProfileTab.svelte';
-  import ResultView from '$lib/components/ResultView.svelte';
-  import ColorDetailView from '$lib/components/ColorDetailView.svelte';
 
   // Load data on mount
   onMount(async () => {
@@ -64,6 +62,7 @@
           isPublic: true,
           likeCount: likeInfo.count,
           isLiked: likeInfo.liked,
+          userId: scan.user_id,
         };
       });
       communityItems.set(items);
@@ -90,13 +89,5 @@
     <CommunityTab />
   {:else if $activeTab === 'profile'}
     <ProfileTab />
-  {/if}
-
-  {#if $detailItem}
-    <ResultView />
-  {/if}
-
-  {#if $detailColor}
-    <ColorDetailView />
   {/if}
 {/if}

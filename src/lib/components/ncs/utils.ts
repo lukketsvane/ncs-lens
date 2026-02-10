@@ -1,3 +1,5 @@
+import { ncsToRgb as ncsToRgbLib } from '$lib/ncs-colors';
+
 export interface NCSColor {
   hue: number;
   blackness: number;
@@ -28,32 +30,10 @@ export const degreesToNcsHue = (degrees: number): string => {
 
 export const ncsToCss = (color: NCSColor): string => {
   const { hue, blackness, chromaticness } = color;
-  
-  let cssHue = 0;
-  let d = hue % 360;
-  if (d < 0) d += 360;
-
-  if (d <= 90) { 
-    const t = d / 90;
-    cssHue = 60 - t * 60;
-  } else if (d <= 180) {
-    const t = (d - 90) / 90;
-    cssHue = 360 - t * 120;
-  } else if (d <= 270) {
-    const t = (d - 180) / 90;
-    cssHue = 240 - t * 120;
-  } else {
-    const t = (d - 270) / 90;
-    cssHue = 120 - t * 60;
-  }
-
-  const l = Math.max(0, 100 - blackness - (chromaticness * 0.5));
-  let s = 0;
-  if (chromaticness > 0) {
-      s = Math.min(100, chromaticness * 1.5); 
-  }
-
-  return `hsl(${cssHue.toFixed(1)}, ${s.toFixed(1)}%, ${l.toFixed(1)}%)`;
+  const hueStr = degreesToNcsHue(hue);
+  const isNeutral = hueStr === 'N' || chromaticness === 0;
+  const rgb = ncsToRgbLib(blackness, chromaticness, hue, isNeutral);
+  return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
 };
 
 export const generateTrianglePoints = () => {

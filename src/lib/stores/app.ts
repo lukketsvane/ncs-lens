@@ -42,6 +42,7 @@ export interface HistoryItem {
   isPublic?: boolean;
   likeCount?: number;
   isLiked?: boolean;
+  userId?: string;
 }
 
 export type Tab = 'scan' | 'palette' | 'history' | 'community' | 'profile';
@@ -64,6 +65,7 @@ export const loading = writable(false);
 export const detailItem = writable<HistoryItem | null>(null);
 export const detailColor = writable<ColorMatch | null>(null);
 export const salientMode = writable(false);
+export const compareTarget = writable<ColorMatch | null>(null);
 
 // Helper function to check if a color is saved
 export function isColorSaved(color: ColorMatch): boolean {
