@@ -21,18 +21,24 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
   const clientId = env.VIPPS_CLIENT_ID;
   const clientSecret = env.VIPPS_CLIENT_SECRET;
   const subscriptionKey = env.VIPPS_SUBSCRIPTION_KEY;
+  const msn = env.VIPPS_MSN || '';
   const apiUrl = env.VIPPS_API_URL || 'https://api.vipps.no';
   const redirectUri = `${url.origin}/api/vipps/callback`;
 
   // Exchange code for tokens
+  const tokenHeaders: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Ocp-Apim-Subscription-Key': subscriptionKey || '',
+  };
+  if (msn) {
+    tokenHeaders['Merchant-Serial-Number'] = msn;
+  }
+
   const tokenResponse = await fetch(
     `${apiUrl}/access-management-1.0/access/oauth2/token`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Ocp-Apim-Subscription-Key': subscriptionKey || '',
-      },
+      headers: tokenHeaders,
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
@@ -45,20 +51,25 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 
   if (!tokenResponse.ok) {
     const errText = await tokenResponse.text();
-    console.error('Vipps token exchange failed:', errText);
+    console.error('Vipps token exchange failed:', tokenResponse.status, errText);
     throw error(502, 'Failed to authenticate with Vipps');
   }
 
   const tokens = await tokenResponse.json();
 
-  // Get user info from Vipps
+  // Get user info from Vipps (correct endpoint: /vipps-userinfo-api/userinfo)
+  const userinfoHeaders: Record<string, string> = {
+    Authorization: `Bearer ${tokens.access_token}`,
+    'Ocp-Apim-Subscription-Key': subscriptionKey || '',
+  };
+  if (msn) {
+    userinfoHeaders['Merchant-Serial-Number'] = msn;
+  }
+
   const userInfoResponse = await fetch(
-    `${apiUrl}/access-management-1.0/access/userinfo`,
+    `${apiUrl}/vipps-userinfo-api/userinfo`,
     {
-      headers: {
-        Authorization: `Bearer ${tokens.access_token}`,
-        'Ocp-Apim-Subscription-Key': subscriptionKey || '',
-      },
+      headers: userinfoHeaders,
     }
   );
 

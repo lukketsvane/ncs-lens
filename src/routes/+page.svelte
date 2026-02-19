@@ -4,6 +4,9 @@
   import { onMount } from 'svelte';
   import { getUserScans, getPublicScans, getLikesInfo, type ScanRecord } from '$lib/scans';
   import { getSavedColors } from '$lib/saved-colors';
+  import { toasts } from '$lib/stores/toast';
+  import { t } from '$lib/i18n';
+  import { page } from '$app/stores';
   import type { HistoryItem } from '$lib/stores/app';
 
   import ScanTab from '$lib/components/ScanTab.svelte';
@@ -12,8 +15,24 @@
   import CommunityTab from '$lib/components/CommunityTab.svelte';
   import ProfileTab from '$lib/components/ProfileTab.svelte';
 
-  // Load data on mount
+  // Handle subscription callback params
   onMount(async () => {
+    const subscriptionParam = $page.url.searchParams.get('subscription');
+    if (subscriptionParam === 'success') {
+      toasts.success($t('subscription.activated'));
+      activeTab.set('profile');
+      // Clean URL params
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('subscription');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    } else if (subscriptionParam === 'error' || subscriptionParam === 'cancelled') {
+      toasts.error($t('subscription.error'));
+      activeTab.set('profile');
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('subscription');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    }
+
     await loadData();
   });
 

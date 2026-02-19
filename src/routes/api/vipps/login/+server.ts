@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: 'code',
-    scope: 'openid name email phoneNumber',
+    scope: 'openid name email phoneNumber address',
     state,
     redirect_uri: redirectUri,
   });
