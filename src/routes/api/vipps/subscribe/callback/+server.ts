@@ -61,8 +61,9 @@ export const GET: RequestHandler = async ({ url }) => {
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + 1);
+    // Handle month overflow (e.g., Jan 31 + 1 month → Mar 3, adjust to Feb 28)
     if (endDate.getDate() !== startDate.getDate()) {
-      endDate.setDate(0);
+      endDate.setDate(0); // Set to last day of previous month
     }
 
     await supabaseAdmin.from('subscriptions').upsert(
@@ -79,7 +80,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
     // Capture the payment if it's authorized but not yet charged
     if (paymentData.state === 'AUTHORIZED') {
-      await fetch(
+      const captureResponse = await fetch(
         `${apiUrl}/epayment/v1/payments/${encodeURIComponent(orderId)}/capture`,
         {
           method: 'POST',
@@ -97,6 +98,9 @@ export const GET: RequestHandler = async ({ url }) => {
           }),
         }
       );
+      if (!captureResponse.ok) {
+        console.error('Vipps payment capture failed:', await captureResponse.text());
+      }
     }
 
     throw redirect(302, '/?subscription=success');

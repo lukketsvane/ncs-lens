@@ -18,15 +18,12 @@
   // Handle subscription callback params
   onMount(async () => {
     const subscriptionParam = $page.url.searchParams.get('subscription');
-    if (subscriptionParam === 'success') {
-      toasts.success($t('subscription.activated'));
-      activeTab.set('profile');
-      // Clean URL params
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete('subscription');
-      window.history.replaceState({}, '', cleanUrl.toString());
-    } else if (subscriptionParam === 'error' || subscriptionParam === 'cancelled') {
-      toasts.error($t('subscription.error'));
+    if (subscriptionParam) {
+      if (subscriptionParam === 'success') {
+        toasts.success($t('subscription.activated'));
+      } else {
+        toasts.error($t('subscription.error'));
+      }
       activeTab.set('profile');
       const cleanUrl = new URL(window.location.href);
       cleanUrl.searchParams.delete('subscription');

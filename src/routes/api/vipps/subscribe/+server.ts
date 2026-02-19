@@ -40,7 +40,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const accessToken = tokenData.access_token;
 
   // Create ePayment for 10 NOK subscription
-  const orderId = `sub-${userId.substring(0, 8)}-${Date.now()}`;
+  const orderId = `sub-${crypto.randomUUID()}`;
   const returnUrl = `${url.origin}/api/vipps/subscribe/callback?orderId=${encodeURIComponent(orderId)}&userId=${encodeURIComponent(userId)}`;
 
   const paymentBody = {
