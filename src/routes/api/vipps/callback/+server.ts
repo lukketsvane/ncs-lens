@@ -25,12 +25,16 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
   const apiUrl = env.VIPPS_API_URL || 'https://api.vipps.no';
   const redirectUri = `${url.origin}/api/vipps/callback`;
 
+  if (!clientId || !clientSecret || !subscriptionKey) {
+    throw error(500, 'Missing Vipps configuration');
+  }
+
   // Exchange code for tokens using client_secret_basic
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
   const tokenHeaders: Record<string, string> = {
     'Content-Type': 'application/x-www-form-urlencoded',
     'Authorization': `Basic ${basicAuth}`,
-    'Ocp-Apim-Subscription-Key': subscriptionKey || '',
+    'Ocp-Apim-Subscription-Key': subscriptionKey,
   };
   if (msn) {
     tokenHeaders['Merchant-Serial-Number'] = msn;
@@ -60,7 +64,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
   // Get user info from Vipps (correct endpoint: /vipps-userinfo-api/userinfo)
   const userinfoHeaders: Record<string, string> = {
     Authorization: `Bearer ${tokens.access_token}`,
-    'Ocp-Apim-Subscription-Key': subscriptionKey || '',
+    'Ocp-Apim-Subscription-Key': subscriptionKey,
   };
   if (msn) {
     userinfoHeaders['Merchant-Serial-Number'] = msn;
