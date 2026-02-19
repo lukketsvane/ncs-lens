@@ -188,6 +188,16 @@
     detailColor.set(null);
   }
 
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      if (showSimilarColors) {
+        showSimilarColors = false;
+      } else {
+        handleBack();
+      }
+    }
+  }
+
   async function handleSaveColor() {
     if (!$user || !$detailColor) return;
     const saved = await saveColor($user.id, {
@@ -336,10 +346,14 @@
 </script>
 
 {#if $detailColor}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="fixed inset-0 z-[60] bg-white flex flex-col animate-in slide-in-from-bottom duration-300"
     class:swipe-returning={swipeReturning}
     style="transform: translateX({swipeProgress * 100}px); opacity: {1 - swipeProgress * 0.3}"
+    role="dialog"
+    tabindex="-1"
+    onkeydown={handleKeydown}
     use:swipeGesture={{
       onSwipeRight: handleBack,
       threshold: 50,

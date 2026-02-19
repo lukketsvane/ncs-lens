@@ -39,6 +39,10 @@
 
   function handleBack() { detailItem.set(null); }
 
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') handleBack();
+  }
+
   async function handlePublish() {
     if (!$detailItem || isPublic) return;
     isPublishing = true;
@@ -159,10 +163,14 @@
 </script>
 
 {#if $detailItem}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="fixed inset-0 bg-[#F0F2F5] z-40 overflow-y-auto no-scrollbar safe-area-top safe-area-bottom"
     class:swipe-returning={swipeReturning}
     style="transform: translateX({swipeProgress * 100}px); opacity: {1 - swipeProgress * 0.3}"
+    role="dialog"
+    tabindex="-1"
+    onkeydown={handleKeydown}
     use:swipeGesture={{
       onSwipeRight: handleBack,
       threshold: 50,
