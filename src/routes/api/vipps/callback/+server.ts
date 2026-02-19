@@ -84,44 +84,30 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
   // Find or create user in Supabase
   const supabaseAdmin = getSupabaseAdmin();
 
-  // Check if user exists by email
-  const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-  const existingUser = existingUsers?.users?.find(
-    (u) => u.email?.toLowerCase() === email.toLowerCase()
-  );
+  // Try to create user first; if they already exist, this will fail gracefully
+  const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    user_metadata: {
+      display_name: name,
+      phone,
+      provider: 'vipps',
+    },
+  });
 
-  let userId: string;
-
-  if (existingUser) {
-    userId = existingUser.id;
-  } else {
-    // Create new user
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      user_metadata: {
-        display_name: name,
-        phone,
-        provider: 'vipps',
-      },
-    });
-
-    if (createError || !newUser.user) {
-      console.error('Failed to create Supabase user:', createError);
-      throw error(500, 'Failed to create user account');
-    }
-
-    userId = newUser.user.id;
-
-    // Update profile with Vipps info
+  if (newUser?.user) {
+    // New user created - set up their profile
     await supabaseAdmin.from('profiles').upsert(
       {
-        id: userId,
+        id: newUser.user.id,
         display_name: name || null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' }
     );
+  } else if (createError && !createError.message?.includes('already been registered')) {
+    console.error('Failed to create Supabase user:', createError);
+    throw error(500, 'Failed to create user account');
   }
 
   // Generate a magic link to sign the user in

@@ -52,10 +52,14 @@ export async function getSubscription(userId: string): Promise<Subscription | nu
  * Subscribe user to the free plan
  */
 export async function subscribeFree(userId: string): Promise<boolean> {
-  // Calculate end date (1 month from now)
+  // Calculate end date (1 month from now, clamped to valid day)
   const startDate = new Date();
-  const endDate = new Date();
+  const endDate = new Date(startDate);
   endDate.setMonth(endDate.getMonth() + 1);
+  // Handle month overflow (e.g., Jan 31 → Mar 3 becomes Feb 28)
+  if (endDate.getDate() !== startDate.getDate()) {
+    endDate.setDate(0); // Set to last day of previous month
+  }
 
   const { error } = await supabase
     .from('subscriptions')

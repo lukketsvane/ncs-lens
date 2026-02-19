@@ -27,7 +27,9 @@
     scanStatusLoading = true;
     try {
       scanStatus = await canScan($user.id);
-    } catch {
+    } catch (err) {
+      // On error (e.g., subscriptions table not yet created), allow scanning with default limit
+      console.warn('Failed to check scan status:', err);
       scanStatus = { allowed: true, remaining: 10, hasSubscription: false };
     }
     scanStatusLoading = false;
