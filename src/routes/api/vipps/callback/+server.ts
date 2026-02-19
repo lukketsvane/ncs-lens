@@ -25,9 +25,11 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
   const apiUrl = env.VIPPS_API_URL || 'https://api.vipps.no';
   const redirectUri = `${url.origin}/api/vipps/callback`;
 
-  // Exchange code for tokens
+  // Exchange code for tokens using client_secret_basic
+  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
   const tokenHeaders: Record<string, string> = {
     'Content-Type': 'application/x-www-form-urlencoded',
+    'Authorization': `Basic ${basicAuth}`,
     'Ocp-Apim-Subscription-Key': subscriptionKey || '',
   };
   if (msn) {
@@ -43,8 +45,6 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
         grant_type: 'authorization_code',
         code,
         redirect_uri: redirectUri,
-        client_id: clientId || '',
-        client_secret: clientSecret || '',
       }),
     }
   );
