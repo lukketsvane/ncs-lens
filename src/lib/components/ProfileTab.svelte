@@ -9,7 +9,7 @@
   import { goto } from '$app/navigation';
   import { toasts } from '$lib/stores/toast';
   import { t, locale } from '$lib/i18n';
-  import { getSubscription, subscribeFree, cancelSubscription, type Subscription } from '$lib/subscription';
+  import { getSubscription, initiateSubscription, cancelSubscription, type Subscription } from '$lib/subscription';
 
   interface Profile {
     id: string;
@@ -150,14 +150,14 @@
   async function handleActivateSubscription() {
     if (!$user) return;
     subscriptionLoading = true;
-    const success = await subscribeFree($user.id);
-    if (success) {
-      subscription = await getSubscription($user.id);
-      toasts.success($t('subscription.activated'));
+    const result = await initiateSubscription($user.id);
+    if (result?.redirectUrl) {
+      // Redirect to Vipps payment page
+      window.location.href = result.redirectUrl;
     } else {
       toasts.error($t('subscription.error'));
+      subscriptionLoading = false;
     }
-    subscriptionLoading = false;
   }
 
   async function handleCancelSubscription() {

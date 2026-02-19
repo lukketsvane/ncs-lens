@@ -53,8 +53,7 @@
       </p>
       <p class="text-gray-700 mb-4">Gjeldande prisar:</p>
       <ul class="list-disc list-inside text-gray-700 mb-4 space-y-1">
-        <li>Månadsabonnement: 49 kr/månad</li>
-        <li>Årsabonnement: 399 kr/år</li>
+        <li>Månadsabonnement: 10 kr/månad</li>
       </ul>
 
       <h2 class="text-lg font-bold text-gray-900 mt-8 mb-4">Levering</h2>

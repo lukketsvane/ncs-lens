@@ -189,15 +189,16 @@ const no: Record<string, string> = {
   'subscription.free_plan': 'Gratis plan',
   'subscription.free_plan_desc': '10 skanningar per dag',
   'subscription.pro_plan': 'Pro-abonnement',
-  'subscription.pro_plan_desc': 'Ubegrensa skanningar',
+  'subscription.pro_plan_desc': 'Ubegrensa skanningar – 10 kr/månad',
   'subscription.active': 'Aktivt',
-  'subscription.activate': 'Aktiver gratis prøveperiode',
+  'subscription.activate': 'Abonner for 10 kr/månad',
   'subscription.cancel': 'Avbryt abonnement',
   'subscription.expires': 'Utløper {date}',
   'subscription.free_trial': 'Gratis prøveperiode',
   'subscription.activated': 'Abonnement aktivert!',
   'subscription.cancelled': 'Abonnement avbrote',
   'subscription.error': 'Klarte ikkje oppdatere abonnement',
+  'subscription.price': '10 kr/månad',
 
   // Scan limits
   'scan.limit_reached': 'Dagleg grense nådd',

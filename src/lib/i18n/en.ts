@@ -189,15 +189,16 @@ const en: Record<string, string> = {
   'subscription.free_plan': 'Free Plan',
   'subscription.free_plan_desc': '10 scans per day',
   'subscription.pro_plan': 'Pro Subscription',
-  'subscription.pro_plan_desc': 'Unlimited scans',
+  'subscription.pro_plan_desc': 'Unlimited scans – 10 NOK/month',
   'subscription.active': 'Active',
-  'subscription.activate': 'Activate free trial',
+  'subscription.activate': 'Subscribe for 10 NOK/month',
   'subscription.cancel': 'Cancel subscription',
   'subscription.expires': 'Expires {date}',
   'subscription.free_trial': 'Free trial',
   'subscription.activated': 'Subscription activated!',
   'subscription.cancelled': 'Subscription cancelled',
   'subscription.error': 'Failed to update subscription',
+  'subscription.price': '10 NOK/month',
 
   // Scan limits
   'scan.limit_reached': 'Daily limit reached',

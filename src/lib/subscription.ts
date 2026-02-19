@@ -3,14 +3,21 @@ import { supabase } from './supabase';
 export interface Subscription {
   id: string;
   user_id: string;
-  status: 'active' | 'cancelled' | 'expired';
+  status: 'active' | 'cancelled' | 'expired' | 'pending';
   plan_type: string;
   start_date: string;
   end_date: string | null;
+  vipps_order_id: string | null;
   created_at: string;
 }
 
 const DAILY_SCAN_LIMIT = 10;
+
+/**
+ * Subscription price in NOK (øre)
+ */
+export const SUBSCRIPTION_PRICE_NOK = 1000; // 10.00 NOK in øre
+export const SUBSCRIPTION_PRICE_DISPLAY = '10 kr';
 
 /**
  * Check if user has an active subscription
@@ -49,37 +56,26 @@ export async function getSubscription(userId: string): Promise<Subscription | nu
 }
 
 /**
- * Subscribe user to the free plan
+ * Initiate a Vipps payment for the Pro subscription (10 NOK/month)
  */
-export async function subscribeFree(userId: string): Promise<boolean> {
-  // Calculate end date (1 month from now, clamped to valid day)
-  const startDate = new Date();
-  const endDate = new Date(startDate);
-  endDate.setMonth(endDate.getMonth() + 1);
-  // Handle month overflow (e.g., Jan 31 → Mar 3 becomes Feb 28)
-  if (endDate.getDate() !== startDate.getDate()) {
-    endDate.setDate(0); // Set to last day of previous month
+export async function initiateSubscription(userId: string): Promise<{ redirectUrl: string } | null> {
+  try {
+    const response = await fetch('/api/vipps/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to initiate subscription:', await response.text());
+      return null;
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.error('Error initiating subscription:', err);
+    return null;
   }
-
-  const { error } = await supabase
-    .from('subscriptions')
-    .upsert(
-      {
-        user_id: userId,
-        status: 'active',
-        plan_type: 'free_trial',
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
-      },
-      { onConflict: 'user_id' }
-    );
-
-  if (error) {
-    console.error('Error creating subscription:', error);
-    return false;
-  }
-
-  return true;
 }
 
 /**
