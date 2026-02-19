@@ -180,6 +180,32 @@ const en: Record<string, string> = {
   'error.go_home': 'Go Home',
   'error.something_wrong': 'Something went wrong',
 
+  // Vipps login
+  'profile.or_divider': 'or',
+  'profile.sign_in_vipps': 'Sign in with Vipps',
+
+  // Subscription
+  'subscription.title': 'Subscription',
+  'subscription.free_plan': 'Free Plan',
+  'subscription.free_plan_desc': '10 scans per day',
+  'subscription.pro_plan': 'Pro Subscription',
+  'subscription.pro_plan_desc': 'Unlimited scans',
+  'subscription.active': 'Active',
+  'subscription.activate': 'Activate free trial',
+  'subscription.cancel': 'Cancel subscription',
+  'subscription.expires': 'Expires {date}',
+  'subscription.free_trial': 'Free trial',
+  'subscription.activated': 'Subscription activated!',
+  'subscription.cancelled': 'Subscription cancelled',
+  'subscription.error': 'Failed to update subscription',
+
+  // Scan limits
+  'scan.limit_reached': 'Daily limit reached',
+  'scan.limit_reached_desc': 'You have used all 10 scans for today. Upgrade to Pro for unlimited scans.',
+  'scan.remaining': '{count} of 10 scans remaining today',
+  'scan.unlimited': 'Unlimited scans (Pro)',
+  'scan.upgrade': 'Upgrade to Pro',
+
   // Toast
   'toast.error': 'Error',
 };

@@ -180,6 +180,32 @@ const no: Record<string, string> = {
   'error.go_home': 'Gå heim',
   'error.something_wrong': 'Noko gjekk gale',
 
+  // Vipps login
+  'profile.or_divider': 'eller',
+  'profile.sign_in_vipps': 'Logg inn med Vipps',
+
+  // Subscription
+  'subscription.title': 'Abonnement',
+  'subscription.free_plan': 'Gratis plan',
+  'subscription.free_plan_desc': '10 skanningar per dag',
+  'subscription.pro_plan': 'Pro-abonnement',
+  'subscription.pro_plan_desc': 'Ubegrensa skanningar',
+  'subscription.active': 'Aktivt',
+  'subscription.activate': 'Aktiver gratis prøveperiode',
+  'subscription.cancel': 'Avbryt abonnement',
+  'subscription.expires': 'Utløper {date}',
+  'subscription.free_trial': 'Gratis prøveperiode',
+  'subscription.activated': 'Abonnement aktivert!',
+  'subscription.cancelled': 'Abonnement avbrote',
+  'subscription.error': 'Klarte ikkje oppdatere abonnement',
+
+  // Scan limits
+  'scan.limit_reached': 'Dagleg grense nådd',
+  'scan.limit_reached_desc': 'Du har brukt alle 10 skanningane dine for i dag. Oppgrader til Pro for ubegrensa skanningar.',
+  'scan.remaining': '{count} av 10 skanningar att i dag',
+  'scan.unlimited': 'Ubegrensa skanningar (Pro)',
+  'scan.upgrade': 'Oppgrader til Pro',
+
   // Toast
   'toast.error': 'Feil',
 };

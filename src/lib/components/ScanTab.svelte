@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Sparkles, Camera, Image as ImageIcon, Loader2, User, Zap } from 'lucide-svelte';
+  import { Sparkles, Camera, Image as ImageIcon, Loader2, User, Zap, AlertCircle, Crown } from 'lucide-svelte';
   import { user } from '$lib/stores/auth';
   import { loading, salientMode, detailItem, history, activeTab } from '$lib/stores/app';
   import { analyzeImage } from '$lib/api';
@@ -8,8 +8,30 @@
   import { toasts } from '$lib/stores/toast';
   import { t } from '$lib/i18n';
   import type { HistoryItem } from '$lib/stores/app';
+  import { canScan } from '$lib/subscription';
 
   let fileInput: HTMLInputElement;
+  let scanStatus = $state<{ allowed: boolean; remaining: number; hasSubscription: boolean } | null>(null);
+  let scanStatusLoading = $state(false);
+
+  $effect(() => {
+    if ($user) {
+      checkScanStatus();
+    } else {
+      scanStatus = null;
+    }
+  });
+
+  async function checkScanStatus() {
+    if (!$user) return;
+    scanStatusLoading = true;
+    try {
+      scanStatus = await canScan($user.id);
+    } catch {
+      scanStatus = { allowed: true, remaining: 10, hasSubscription: false };
+    }
+    scanStatusLoading = false;
+  }
 
   async function handleFileSelect(e: Event) {
     const target = e.target as HTMLInputElement;
@@ -19,6 +41,12 @@
 
   async function processFile(file: File) {
     if (!$user) return;
+
+    // Check scan limit before processing
+    if (scanStatus && !scanStatus.allowed) {
+      toasts.error($t('scan.limit_reached'));
+      return;
+    }
 
     loading.set(true);
     const reader = new FileReader();
@@ -48,6 +76,7 @@
         toasts.error($t('scan.failed'));
       } finally {
         loading.set(false);
+        checkScanStatus();
       }
     };
     reader.readAsDataURL(file);
@@ -88,6 +117,24 @@
             </button>
           </div>
         </div>
+      {:else if scanStatus && !scanStatus.allowed}
+        <div class="group relative bg-amber-50 rounded-[40px] w-full max-w-[320px] aspect-[3/4] border border-amber-200 flex flex-col items-center justify-center gap-6 overflow-hidden">
+          <div class="absolute inset-0 bg-gradient-to-tr from-amber-50 via-white to-amber-50 opacity-60"></div>
+          <div class="relative z-10 w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center">
+            <AlertCircle size={32} class="text-amber-500" />
+          </div>
+          <div class="relative z-10 text-center space-y-3 px-6">
+            <h2 class="text-xl font-bold text-amber-800 tracking-tight">{$t('scan.limit_reached')}</h2>
+            <p class="text-sm text-amber-600 leading-relaxed">{$t('scan.limit_reached_desc')}</p>
+            <button
+              onclick={() => activeTab.set('profile')}
+              class="mt-4 bg-amber-500 text-white font-semibold py-3 px-6 rounded-2xl hover:bg-amber-600 transition-all flex items-center justify-center gap-2 mx-auto"
+            >
+              <Crown size={18} />
+              <span>{$t('scan.upgrade')}</span>
+            </button>
+          </div>
+        </div>
       {:else}
         <button
           onclick={() => fileInput.click()}
@@ -104,6 +151,20 @@
             </div>
           </div>
         </button>
+      {/if}
+
+      {#if $user && scanStatus}
+        <div class="mt-3 text-center">
+          {#if scanStatus.hasSubscription}
+            <span class="text-xs text-amber-600 font-medium bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+              <Crown size={10} class="inline -mt-0.5" /> {$t('scan.unlimited')}
+            </span>
+          {:else}
+            <span class="text-xs text-gray-500 font-medium bg-gray-100 px-3 py-1 rounded-full">
+              {$t('scan.remaining', { count: String(scanStatus.remaining) })}
+            </span>
+          {/if}
+        </div>
       {/if}
 
       {#if $user}
