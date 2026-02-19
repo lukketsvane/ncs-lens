@@ -217,11 +217,19 @@
                       class="absolute z-20 -translate-x-1/2 -translate-y-full pointer-events-none"
                       style="left: {pickedColor.x}%; top: {pickedColor.y}%"
                     >
-                      <div class="bg-white rounded-xl shadow-xl p-2 mb-2 text-center min-w-[100px] pointer-events-auto">
+                      <button
+                        class="bg-white rounded-xl shadow-xl p-2 mb-2 text-center min-w-[100px] pointer-events-auto cursor-pointer hover:scale-105 transition-transform"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          const rgb = { r: parseInt(pickedColor!.hex.slice(1,3), 16), g: parseInt(pickedColor!.hex.slice(3,5), 16), b: parseInt(pickedColor!.hex.slice(5,7), 16) };
+                          const hsl = { h: 0, s: 0, l: 0 };
+                          selectedPaletteColor.set({ rgb, hsl, hex: pickedColor!.hex, pantone: pickedColor!.pantone, x: pickedColor!.x / 100, y: pickedColor!.y / 100 });
+                        }}
+                      >
                         <div class="w-full h-8 rounded-lg mb-1" style="background-color: {pickedColor.hex}"></div>
                         <p class="text-[10px] font-bold text-slate-900">{pickedColor.pantone.code}</p>
                         <p class="text-[9px] text-slate-500">{pickedColor.hex.toUpperCase()}</p>
-                      </div>
+                      </button>
                     </div>
                     <div
                       class="absolute w-5 h-5 rounded-full border-2 border-white shadow-lg -translate-x-1/2 -translate-y-1/2 z-10 ring-2 ring-black/20"
