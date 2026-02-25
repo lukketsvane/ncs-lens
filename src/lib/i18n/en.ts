@@ -200,6 +200,10 @@ const en: Record<string, string> = {
   'subscription.cancelled': 'Subscription cancelled',
   'subscription.error': 'Failed to update subscription',
   'subscription.price': '10 NOK/month',
+  'subscription.expired': 'Expired',
+  'subscription.expired_desc': 'Your subscription has expired. Renew to continue with unlimited scans.',
+  'subscription.expired_on': 'Expired on {date}',
+  'subscription.renew': 'Renew for 10 NOK/month',
 
   // Scan limits
   'scan.limit_reached': 'Daily limit reached',

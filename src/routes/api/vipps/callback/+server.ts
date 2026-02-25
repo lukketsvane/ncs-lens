@@ -110,47 +110,28 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     throw redirect(302, '/?vipps_error=no_email');
   }
 
-  // Step 3: Create or find user in Supabase
+  // Step 3: Create or find user in Supabase (create-first approach)
   const supabaseAdmin = getSupabaseAdmin();
-
-  // Try to find existing user by email first
-  const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-  const existingUser = existingUsers?.users?.find(
-    (u) => u.email?.toLowerCase() === email.toLowerCase()
-  );
-
   let userId: string;
+  let isNewUser = false;
 
-  if (existingUser) {
-    userId = existingUser.id;
-    // Update user metadata with latest Vipps info
-    await supabaseAdmin.auth.admin.updateUser(userId, {
-      user_metadata: {
-        ...existingUser.user_metadata,
-        vipps_sub: vippsSub,
-        phone: phone || existingUser.user_metadata?.phone,
-        provider: existingUser.user_metadata?.provider || 'vipps',
-      },
-    });
-  } else {
-    // Create new user
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      user_metadata: {
-        display_name: name,
-        phone,
-        vipps_sub: vippsSub,
-        provider: 'vipps',
-      },
-    });
+  // Try creating the user first. If they already exist, this fails gracefully.
+  const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    user_metadata: {
+      display_name: name,
+      phone,
+      vipps_sub: vippsSub,
+      provider: 'vipps',
+    },
+  });
 
-    if (createError || !newUser?.user) {
-      console.error('Failed to create Supabase user:', createError);
-      throw redirect(302, '/?vipps_error=create_user');
-    }
-
+  if (newUser?.user) {
+    // New user created successfully
     userId = newUser.user.id;
+    isNewUser = true;
+    console.log('Created new Supabase user for Vipps login:', userId);
 
     // Create profile for new user
     await supabaseAdmin.from('profiles').upsert(
@@ -161,6 +142,68 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
       },
       { onConflict: 'id' }
     );
+  } else {
+    // User already exists — look them up directly by email
+    console.log('User exists, looking up by email:', email);
+
+    // Try listUsers with per_page=1 and a targeted approach
+    const { data: usersData, error: lookupError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+    const existingUser = usersData?.users?.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
+    );
+
+    if (!existingUser) {
+      // Fallback: try generating a magic link which works for existing users
+      const { data: fallbackLink } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+        options: { redirectTo: url.origin },
+      });
+
+      if (fallbackLink?.user) {
+        userId = fallbackLink.user.id;
+        // Update metadata
+        await supabaseAdmin.auth.admin.updateUser(userId, {
+          user_metadata: {
+            ...fallbackLink.user.user_metadata,
+            vipps_sub: vippsSub,
+            phone: phone || fallbackLink.user.user_metadata?.phone,
+            provider: fallbackLink.user.user_metadata?.provider || 'vipps',
+          },
+        });
+        // Use this link directly for the redirect
+        const tokenHash = fallbackLink.properties?.hashed_token;
+        if (tokenHash) {
+          const appUrl = new URL('/', url.origin);
+          appUrl.searchParams.set('token_hash', tokenHash);
+          appUrl.searchParams.set('type', 'magiclink');
+          throw redirect(302, appUrl.toString());
+        }
+        const verifyUrl = fallbackLink.properties?.action_link;
+        if (verifyUrl) {
+          throw redirect(302, verifyUrl);
+        }
+      }
+
+      console.error('Failed to find or create Supabase user:', createError, lookupError);
+      throw redirect(302, '/?vipps_error=create_user');
+    }
+
+    userId = existingUser.id;
+
+    // Update user metadata with latest Vipps info
+    await supabaseAdmin.auth.admin.updateUser(userId, {
+      user_metadata: {
+        ...existingUser.user_metadata,
+        vipps_sub: vippsSub,
+        phone: phone || existingUser.user_metadata?.phone,
+        provider: existingUser.user_metadata?.provider || 'vipps',
+      },
+    });
   }
 
   // Step 4: Generate magic link and extract token_hash for client-side session
@@ -189,7 +232,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
   // Fallback: redirect to the action_link directly
   const verifyUrl = linkData.properties?.action_link;
   if (!verifyUrl) {
-    console.error('No token_hash or action_link in generateLink response');
+    console.error('No token_hash or action_link in generateLink response:', JSON.stringify(linkData.properties));
     throw redirect(302, '/?vipps_error=auth_token');
   }
 

@@ -200,6 +200,10 @@ const no: Record<string, string> = {
   'subscription.cancelled': 'Abonnement avbrote',
   'subscription.error': 'Klarte ikkje oppdatere abonnement',
   'subscription.price': '10 kr/månad',
+  'subscription.expired': 'Utlope',
+  'subscription.expired_desc': 'Abonnementet ditt har utlope. Forny for å halde fram med ubegrensa skanningar.',
+  'subscription.expired_on': 'Utlope {date}',
+  'subscription.renew': 'Forny for 10 kr/mnd',
 
   // Scan limits
   'scan.limit_reached': 'Dagleg grense nådd',

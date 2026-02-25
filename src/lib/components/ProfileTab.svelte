@@ -9,7 +9,7 @@
   import { goto } from '$app/navigation';
   import { toasts } from '$lib/stores/toast';
   import { t, locale } from '$lib/i18n';
-  import { getSubscription, initiateSubscription, cancelSubscription, type Subscription } from '$lib/subscription';
+  import { getSubscriptionIncludingExpired, isSubscriptionExpired, initiateSubscription, cancelSubscription, type Subscription } from '$lib/subscription';
 
   interface Profile {
     id: string;
@@ -39,6 +39,7 @@
 
   let subscription = $state<Subscription | null>(null);
   let subscriptionLoading = $state(false);
+  let subscriptionExpired = $derived(isSubscriptionExpired(subscription));
 
   $effect(() => {
     if ($user) {
@@ -54,7 +55,7 @@
     const [profileResult, scansData, sub] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', $user.id).single(),
       getPublicScansByUser($user.id),
-      getSubscription($user.id),
+      getSubscriptionIncludingExpired($user.id),
     ]);
     const { data, error } = profileResult;
     if (error && error.code !== 'PGRST116') console.error('Error fetching profile:', error);
@@ -171,6 +172,18 @@
       toasts.error($t('subscription.error'));
     }
     subscriptionLoading = false;
+  }
+
+  async function handleRenewSubscription() {
+    if (!$user) return;
+    subscriptionLoading = true;
+    const result = await initiateSubscription($user.id);
+    if (result?.redirectUrl) {
+      window.location.href = result.redirectUrl;
+    } else {
+      toasts.error($t('subscription.error'));
+      subscriptionLoading = false;
+    }
   }
 
   async function handleSignOut() {
@@ -312,7 +325,7 @@
             <h3 class="font-semibold text-gray-900">{$t('subscription.title')}</h3>
           </div>
 
-          {#if subscription}
+          {#if subscription && !subscriptionExpired}
             <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
               <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
@@ -331,6 +344,28 @@
                 <Loader2 size={16} class="animate-spin" />
               {:else}
                 {$t('subscription.cancel')}
+              {/if}
+            </button>
+          {:else if subscription && subscriptionExpired}
+            <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <Sparkles size={16} class="text-red-400" />
+                  <span class="font-semibold text-red-800">{$t('subscription.pro_plan')}</span>
+                </div>
+                <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">{$t('subscription.expired')}</span>
+              </div>
+              <p class="text-sm text-red-700">{$t('subscription.expired_desc')}</p>
+              {#if subscription.end_date}
+                <p class="text-xs text-red-600 mt-2">{$t('subscription.expired_on', { date: new Date(subscription.end_date).toLocaleDateString() })}</p>
+              {/if}
+            </div>
+            <button onclick={handleRenewSubscription} disabled={subscriptionLoading} class="w-full bg-amber-500 text-white font-semibold py-3 rounded-xl hover:bg-amber-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+              {#if subscriptionLoading}
+                <Loader2 size={16} class="animate-spin" />
+              {:else}
+                <Crown size={16} />
+                <span>{$t('subscription.renew')}</span>
               {/if}
             </button>
           {:else}

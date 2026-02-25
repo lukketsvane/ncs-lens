@@ -17,7 +17,7 @@ Denne guiden forklarar korleis du set opp Vipps Login for NCS Lens.
 5. Legg til den faktiske callback-URL-en:
 
 ```
-https://DIN-APP.vercel.app/api/vipps/callback
+https://ncs.iverfinne.no/api/vipps/callback
 ```
 
 > **NB:** URI-en må stemme EKSAKT – inkludert store/små bokstavar, trailing slash og URL-encoding. Ingen trailing `/` etter `callback`.
@@ -80,7 +80,7 @@ Sjekk også at desse allereie er satt:
 4. Set **Site URL** til:
 
 ```
-https://DIN-APP.vercel.app
+https://ncs.iverfinne.no
 ```
 
 ### Redirect URLs
@@ -88,7 +88,7 @@ https://DIN-APP.vercel.app
 Under same side, legg til desse under **Redirect URLs**:
 
 ```
-https://DIN-APP.vercel.app/**
+https://ncs.iverfinne.no/**
 ```
 
 Dette sikrar at magic link-verifisering og auth-callbacks fungerer korrekt.
@@ -146,14 +146,14 @@ Brukar er innlogga! ✓
 
 ## 6. Sjekkliste
 
-- [ ] **Vipps-portal:** Redirect URI oppdatert til `https://DIN-APP.vercel.app/api/vipps/callback`
+- [ ] **Vipps-portal:** Redirect URI oppdatert til `https://ncs.iverfinne.no/api/vipps/callback`
 - [ ] **Vercel:** `VIPPS_CLIENT_ID` satt
 - [ ] **Vercel:** `VIPPS_CLIENT_SECRET` satt
 - [ ] **Vercel:** `VIPPS_SUBSCRIPTION_KEY` satt
 - [ ] **Vercel:** `VIPPS_MSN` satt til `1070068`
 - [ ] **Vercel:** `VIPPS_API_URL` satt til `https://api.vipps.no`
 - [ ] **Supabase:** Site URL satt til app-URL-en
-- [ ] **Supabase:** Redirect URLs inkluderer `https://DIN-APP.vercel.app/**`
+- [ ] **Supabase:** Redirect URLs inkluderer `https://ncs.iverfinne.no/**`
 - [ ] **Deploy:** Ny deploy etter env-variablar er lagt til
 - [ ] **Test:** Klikk "Logg inn med Vipps" og verifiser full flyt
 
@@ -168,7 +168,7 @@ Brukar er innlogga! ✓
 
 ### Redirect URI-feil frå Vipps
 
-- URI-en i portalen må stemme EKSAKT med `https://DIN-APP.vercel.app/api/vipps/callback`
+- URI-en i portalen må stemme EKSAKT med `https://ncs.iverfinne.no/api/vipps/callback`
 - Ingen trailing slash, ikkje URL-encoded
 
 ### Token exchange feilar (502)
