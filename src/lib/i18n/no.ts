@@ -183,6 +183,7 @@ const no: Record<string, string> = {
   // Vipps login
   'profile.or_divider': 'eller',
   'profile.sign_in_vipps': 'Logg inn med Vipps',
+  'vipps.login_failed': 'Innlogging med Vipps feila. Prøv igjen.',
 
   // Subscription
   'subscription.title': 'Abonnement',
