@@ -7,17 +7,18 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
   const apiUrl = env.VIPPS_API_URL || 'https://api.vipps.no';
 
   if (!clientId) {
-    throw new Error('Missing VIPPS_CLIENT_ID');
+    console.error('Missing VIPPS_CLIENT_ID environment variable');
+    throw redirect(302, '/?vipps_error=server_config');
   }
 
   const redirectUri = `${url.origin}/api/vipps/callback`;
 
-  // Generate random state for CSRF protection
+  // Generate random state for CSRF protection (UUID = 36 chars, well above Vipps minimum of 8)
   const state = crypto.randomUUID();
   cookies.set('vipps_state', state, {
     path: '/',
     httpOnly: true,
-    secure: url.protocol === 'https:',
+    secure: true,
     sameSite: 'lax',
     maxAge: 600, // 10 minutes
   });

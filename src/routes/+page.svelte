@@ -7,6 +7,7 @@
   import { toasts } from '$lib/stores/toast';
   import { t } from '$lib/i18n';
   import { page } from '$app/stores';
+  import { supabase } from '$lib/supabase';
   import type { HistoryItem } from '$lib/stores/app';
 
   import ScanTab from '$lib/components/ScanTab.svelte';
@@ -15,7 +16,7 @@
   import CommunityTab from '$lib/components/CommunityTab.svelte';
   import ProfileTab from '$lib/components/ProfileTab.svelte';
 
-  // Handle subscription callback params
+  // Handle callback params (subscription, Vipps login)
   onMount(async () => {
     const subscriptionParam = $page.url.searchParams.get('subscription');
     if (subscriptionParam) {
@@ -27,6 +28,56 @@
       activeTab.set('profile');
       const cleanUrl = new URL(window.location.href);
       cleanUrl.searchParams.delete('subscription');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    }
+
+    // Handle Vipps login token_hash callback
+    const tokenHash = $page.url.searchParams.get('token_hash');
+    const type = $page.url.searchParams.get('type');
+    if (tokenHash && type === 'magiclink') {
+      try {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: 'magiclink',
+        });
+        if (error) {
+          console.error('Vipps OTP verification failed:', error);
+          toasts.error($t('vipps.login_failed'));
+        }
+      } catch (err) {
+        console.error('Vipps login error:', err);
+        toasts.error($t('vipps.login_failed'));
+      }
+      // Clean URL params
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('token_hash');
+      cleanUrl.searchParams.delete('type');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    }
+
+    // Handle PKCE code exchange (Supabase redirect fallback)
+    const authCode = $page.url.searchParams.get('code');
+    if (authCode) {
+      try {
+        const { error } = await supabase.auth.exchangeCodeForSession(authCode);
+        if (error) {
+          console.error('PKCE code exchange failed:', error);
+        }
+      } catch (err) {
+        console.error('PKCE exchange error:', err);
+      }
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('code');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    }
+
+    // Handle Vipps error callback
+    const vippsError = $page.url.searchParams.get('vipps_error');
+    if (vippsError) {
+      toasts.error($t('vipps.login_failed'));
+      activeTab.set('profile');
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('vipps_error');
       window.history.replaceState({}, '', cleanUrl.toString());
     }
 

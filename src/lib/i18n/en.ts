@@ -183,6 +183,7 @@ const en: Record<string, string> = {
   // Vipps login
   'profile.or_divider': 'or',
   'profile.sign_in_vipps': 'Sign in with Vipps',
+  'vipps.login_failed': 'Vipps login failed. Please try again.',
 
   // Subscription
   'subscription.title': 'Subscription',
