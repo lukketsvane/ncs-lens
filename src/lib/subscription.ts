@@ -56,6 +56,43 @@ export async function getSubscription(userId: string): Promise<Subscription | nu
 }
 
 /**
+ * Get the user's subscription including expired/cancelled ones (for renewal prompts)
+ */
+export async function getSubscriptionIncludingExpired(userId: string): Promise<Subscription | null> {
+  // First try active
+  const { data: activeSub } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .single();
+
+  if (activeSub) return activeSub;
+
+  // Check for expired/cancelled (most recent)
+  const { data: pastSub } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .in('status', ['expired', 'cancelled'])
+    .order('end_date', { ascending: false })
+    .limit(1)
+    .single();
+
+  return pastSub || null;
+}
+
+/**
+ * Check if a subscription is expired
+ */
+export function isSubscriptionExpired(sub: Subscription | null): boolean {
+  if (!sub) return false;
+  if (sub.status === 'expired' || sub.status === 'cancelled') return true;
+  if (sub.status === 'active' && sub.end_date && new Date(sub.end_date) < new Date()) return true;
+  return false;
+}
+
+/**
  * Initiate a Vipps payment for the Pro subscription (10 NOK/month)
  */
 export async function initiateSubscription(userId: string): Promise<{ redirectUrl: string } | null> {

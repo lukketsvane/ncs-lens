@@ -288,7 +288,10 @@
           <div class="w-10"></div>
         </div>
 
-        <div class="p-4 border-b border-gray-100">
+        <button
+          onclick={() => showSimilarColors = false}
+          class="w-full p-4 border-b border-gray-100 text-left hover:bg-gray-50 transition-colors active:scale-[0.98]"
+        >
           <div class="flex items-center gap-3">
             <div class="w-12 h-12 rounded-xl border border-gray-200" style="background-color: {$selectedPaletteColor.pantone.hex}"></div>
             <div>
@@ -296,7 +299,7 @@
               <p class="text-sm text-gray-500">{$selectedPaletteColor.pantone.name}</p>
             </div>
           </div>
-        </div>
+        </button>
 
         <div class="flex-1 overflow-y-auto p-4 space-y-3">
           {#if similarPantoneColors.length === 0}

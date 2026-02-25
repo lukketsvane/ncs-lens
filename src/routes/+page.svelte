@@ -36,13 +36,15 @@
     const type = $page.url.searchParams.get('type');
     if (tokenHash && type === 'magiclink') {
       try {
-        const { error } = await supabase.auth.verifyOtp({
+        const { data, error } = await supabase.auth.verifyOtp({
           token_hash: tokenHash,
           type: 'magiclink',
         });
         if (error) {
-          console.error('Vipps OTP verification failed:', error);
+          console.error('Vipps OTP verification failed:', error.message, error.status);
           toasts.error($t('vipps.login_failed'));
+        } else if (data?.session) {
+          activeTab.set('profile');
         }
       } catch (err) {
         console.error('Vipps login error:', err);
