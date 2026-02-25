@@ -9,7 +9,7 @@
   import { goto } from '$app/navigation';
   import { toasts } from '$lib/stores/toast';
   import { t, locale } from '$lib/i18n';
-  import { getSubscriptionIncludingExpired, isSubscriptionExpired, initiateSubscription, cancelSubscription, type Subscription } from '$lib/subscription';
+  import { getSubscriptionIncludingExpired, isSubscriptionExpired, initiateSubscription, type Subscription } from '$lib/subscription';
 
   interface Profile {
     id: string;
@@ -40,6 +40,7 @@
   let subscription = $state<Subscription | null>(null);
   let subscriptionLoading = $state(false);
   let subscriptionExpired = $derived(isSubscriptionExpired(subscription));
+  let donationAmount = $state(10);
 
   $effect(() => {
     if ($user) {
@@ -151,37 +152,24 @@
   async function handleActivateSubscription() {
     if (!$user) return;
     subscriptionLoading = true;
-    const result = await initiateSubscription($user.id);
+    const result = await initiateSubscription($user.id, donationAmount);
     if (result?.redirectUrl) {
       // Redirect to Vipps payment page
       window.location.href = result.redirectUrl;
     } else {
-      toasts.error($t('subscription.error'));
+      toasts.error($t('donation.error'));
       subscriptionLoading = false;
     }
-  }
-
-  async function handleCancelSubscription() {
-    if (!$user) return;
-    subscriptionLoading = true;
-    const success = await cancelSubscription($user.id);
-    if (success) {
-      subscription = null;
-      toasts.success($t('subscription.cancelled'));
-    } else {
-      toasts.error($t('subscription.error'));
-    }
-    subscriptionLoading = false;
   }
 
   async function handleRenewSubscription() {
     if (!$user) return;
     subscriptionLoading = true;
-    const result = await initiateSubscription($user.id);
+    const result = await initiateSubscription($user.id, donationAmount);
     if (result?.redirectUrl) {
       window.location.href = result.redirectUrl;
     } else {
-      toasts.error($t('subscription.error'));
+      toasts.error($t('donation.error'));
       subscriptionLoading = false;
     }
   }
@@ -322,7 +310,7 @@
         <div class="bg-white rounded-[24px] p-6 border border-white space-y-4">
           <div class="flex items-center gap-2 mb-2">
             <Crown size={18} class="text-amber-500" />
-            <h3 class="font-semibold text-gray-900">{$t('subscription.title')}</h3>
+            <h3 class="font-semibold text-gray-900">{$t('donation.title')}</h3>
           </div>
 
           {#if subscription && !subscriptionExpired}
@@ -330,59 +318,102 @@
               <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
                   <Sparkles size={16} class="text-amber-500" />
-                  <span class="font-semibold text-amber-800">{$t('subscription.pro_plan')}</span>
+                  <span class="font-semibold text-amber-800">{$t('donation.supporter')}</span>
                 </div>
-                <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">{$t('subscription.active')}</span>
+                <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">{$t('donation.active')}</span>
               </div>
-              <p class="text-sm text-amber-700">{$t('subscription.pro_plan_desc')}</p>
+              <p class="text-sm text-amber-700">{$t('donation.supporter_desc')}</p>
               {#if subscription.end_date}
-                <p class="text-xs text-amber-600 mt-2">{$t('subscription.expires', { date: new Date(subscription.end_date).toLocaleDateString() })}</p>
+                <p class="text-xs text-amber-600 mt-2">{$t('donation.expires', { date: new Date(subscription.end_date).toLocaleDateString() })}</p>
               {/if}
             </div>
-            <button onclick={handleCancelSubscription} disabled={subscriptionLoading} class="w-full py-3 rounded-xl border border-gray-200 text-gray-500 text-sm font-medium hover:bg-gray-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-              {#if subscriptionLoading}
-                <Loader2 size={16} class="animate-spin" />
-              {:else}
-                {$t('subscription.cancel')}
-              {/if}
-            </button>
+            <div class="space-y-3">
+              <p class="text-sm text-gray-500">{$t('donation.donate_again_hint')}</p>
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600 whitespace-nowrap">{$t('donation.amount_label')}</span>
+                <div class="flex items-center gap-1 flex-1">
+                  <input type="number" min="1" bind:value={donationAmount} class="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-300 transition-all" />
+                  <span class="text-sm text-gray-500">kr</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                {#each [10, 25, 50, 100] as preset}
+                  <button type="button" onclick={() => donationAmount = preset} class="flex-1 py-2 rounded-xl text-xs font-medium transition-all {donationAmount === preset ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">{preset} kr</button>
+                {/each}
+              </div>
+              <button onclick={handleActivateSubscription} disabled={subscriptionLoading} class="w-full bg-[#FF5B24] text-white font-semibold py-3 rounded-xl hover:bg-[#E54D1B] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                {#if subscriptionLoading}
+                  <Loader2 size={16} class="animate-spin" />
+                {:else}
+                  <Crown size={16} />
+                  <span>{$t('donation.donate_btn', { amount: donationAmount.toString() })}</span>
+                {/if}
+              </button>
+            </div>
           {:else if subscription && subscriptionExpired}
             <div class="bg-red-50 border border-red-200 rounded-xl p-4">
               <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
                   <Sparkles size={16} class="text-red-400" />
-                  <span class="font-semibold text-red-800">{$t('subscription.pro_plan')}</span>
+                  <span class="font-semibold text-red-800">{$t('donation.supporter')}</span>
                 </div>
-                <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">{$t('subscription.expired')}</span>
+                <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">{$t('donation.expired')}</span>
               </div>
-              <p class="text-sm text-red-700">{$t('subscription.expired_desc')}</p>
+              <p class="text-sm text-red-700">{$t('donation.expired_desc')}</p>
               {#if subscription.end_date}
-                <p class="text-xs text-red-600 mt-2">{$t('subscription.expired_on', { date: new Date(subscription.end_date).toLocaleDateString() })}</p>
+                <p class="text-xs text-red-600 mt-2">{$t('donation.expired_on', { date: new Date(subscription.end_date).toLocaleDateString() })}</p>
               {/if}
             </div>
-            <button onclick={handleRenewSubscription} disabled={subscriptionLoading} class="w-full bg-amber-500 text-white font-semibold py-3 rounded-xl hover:bg-amber-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-              {#if subscriptionLoading}
-                <Loader2 size={16} class="animate-spin" />
-              {:else}
-                <Crown size={16} />
-                <span>{$t('subscription.renew')}</span>
-              {/if}
-            </button>
+            <div class="space-y-3">
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600 whitespace-nowrap">{$t('donation.amount_label')}</span>
+                <div class="flex items-center gap-1 flex-1">
+                  <input type="number" min="1" bind:value={donationAmount} class="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-300 transition-all" />
+                  <span class="text-sm text-gray-500">kr</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                {#each [10, 25, 50, 100] as preset}
+                  <button type="button" onclick={() => donationAmount = preset} class="flex-1 py-2 rounded-xl text-xs font-medium transition-all {donationAmount === preset ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">{preset} kr</button>
+                {/each}
+              </div>
+              <button onclick={handleRenewSubscription} disabled={subscriptionLoading} class="w-full bg-[#FF5B24] text-white font-semibold py-3 rounded-xl hover:bg-[#E54D1B] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                {#if subscriptionLoading}
+                  <Loader2 size={16} class="animate-spin" />
+                {:else}
+                  <Crown size={16} />
+                  <span>{$t('donation.donate_btn', { amount: donationAmount.toString() })}</span>
+                {/if}
+              </button>
+            </div>
           {:else}
             <div class="bg-gray-50 rounded-xl p-4">
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-medium text-gray-700">{$t('subscription.free_plan')}</span>
-              </div>
-              <p class="text-sm text-gray-500">{$t('subscription.free_plan_desc')}</p>
+              <p class="text-sm text-gray-500">{$t('donation.description')}</p>
             </div>
-            <button onclick={handleActivateSubscription} disabled={subscriptionLoading} class="w-full bg-amber-500 text-white font-semibold py-3 rounded-xl hover:bg-amber-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-              {#if subscriptionLoading}
-                <Loader2 size={16} class="animate-spin" />
-              {:else}
-                <Crown size={16} />
-                <span>{$t('subscription.activate')}</span>
-              {/if}
-            </button>
+            <div class="space-y-3">
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600 whitespace-nowrap">{$t('donation.amount_label')}</span>
+                <div class="flex items-center gap-1 flex-1">
+                  <input type="number" min="1" bind:value={donationAmount} class="w-full px-3 py-2 bg-gray-50 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-300 transition-all" />
+                  <span class="text-sm text-gray-500">kr</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                {#each [10, 25, 50, 100] as preset}
+                  <button type="button" onclick={() => donationAmount = preset} class="flex-1 py-2 rounded-xl text-xs font-medium transition-all {donationAmount === preset ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">{preset} kr</button>
+                {/each}
+              </div>
+              <button onclick={handleActivateSubscription} disabled={subscriptionLoading} class="w-full bg-[#FF5B24] text-white font-semibold py-3 rounded-xl hover:bg-[#E54D1B] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                {#if subscriptionLoading}
+                  <Loader2 size={16} class="animate-spin" />
+                {:else}
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17.7 6.3c-1.1-1.1-2.5-1.8-4-2L12 4c-1.5.2-2.9.9-4 2C6.5 7.5 6 9.2 6 11c0 3.3 2.7 6 6 6s6-2.7 6-6c0-1.8-.5-3.5-1.7-4.7h1.4z" fill="white"/>
+                  </svg>
+                  <span>{$t('donation.donate_vipps', { amount: donationAmount.toString() })}</span>
+                {/if}
+              </button>
+            </div>
           {/if}
         </div>
 

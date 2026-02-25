@@ -93,14 +93,14 @@ export function isSubscriptionExpired(sub: Subscription | null): boolean {
 }
 
 /**
- * Initiate a Vipps payment for the Pro subscription (10 NOK/month)
+ * Initiate a Vipps donation payment (user chooses amount)
  */
-export async function initiateSubscription(userId: string): Promise<{ redirectUrl: string } | null> {
+export async function initiateSubscription(userId: string, amountNOK: number = 10): Promise<{ redirectUrl: string } | null> {
   try {
     const response = await fetch('/api/vipps/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, amount: amountNOK }),
     });
 
     if (!response.ok) {

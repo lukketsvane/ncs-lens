@@ -57,7 +57,7 @@ export const GET: RequestHandler = async ({ url }) => {
   const supabaseAdmin = getSupabaseAdmin();
 
   if (paymentData.state === 'AUTHORIZED' || paymentData.state === 'CHARGED') {
-    // Payment successful - activate subscription
+    // Payment successful - activate subscription (30 days from now)
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + 1);
@@ -70,7 +70,7 @@ export const GET: RequestHandler = async ({ url }) => {
       {
         user_id: userId,
         status: 'active',
-        plan_type: 'pro',
+        plan_type: 'donation',
         vipps_order_id: orderId,
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
@@ -80,6 +80,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
     // Capture the payment if it's authorized but not yet charged
     if (paymentData.state === 'AUTHORIZED') {
+      const captureAmount = paymentData.amount?.value || 1000;
       const captureResponse = await fetch(
         `${apiUrl}/epayment/v1/payments/${encodeURIComponent(orderId)}/capture`,
         {
@@ -93,7 +94,7 @@ export const GET: RequestHandler = async ({ url }) => {
           body: JSON.stringify({
             modificationAmount: {
               currency: 'NOK',
-              value: 1000,
+              value: captureAmount,
             },
           }),
         }
@@ -103,7 +104,7 @@ export const GET: RequestHandler = async ({ url }) => {
       }
     }
 
-    throw redirect(302, '/?subscription=success');
+    throw redirect(302, '/?donation=success');
   } else {
     // Payment failed or was cancelled
     await supabaseAdmin
@@ -112,6 +113,6 @@ export const GET: RequestHandler = async ({ url }) => {
       .eq('user_id', userId)
       .eq('vipps_order_id', orderId);
 
-    throw redirect(302, '/?subscription=cancelled');
+    throw redirect(302, '/?donation=cancelled');
   }
 };

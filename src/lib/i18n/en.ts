@@ -185,7 +185,7 @@ const en: Record<string, string> = {
   'profile.sign_in_vipps': 'Sign in with Vipps',
   'vipps.login_failed': 'Vipps login failed. Please try again.',
 
-  // Subscription
+  // Subscription / Donation
   'subscription.title': 'Subscription',
   'subscription.free_plan': 'Free Plan',
   'subscription.free_plan_desc': '10 scans per day',
@@ -204,6 +204,23 @@ const en: Record<string, string> = {
   'subscription.expired_desc': 'Your subscription has expired. Renew to continue with unlimited scans.',
   'subscription.expired_on': 'Expired on {date}',
   'subscription.renew': 'Renew for 10 NOK/month',
+
+  // Donation
+  'donation.title': 'Support NCS Lens',
+  'donation.description': 'Enjoying the app? Support us with any amount via Vipps and get 30 days of unlimited scans!',
+  'donation.amount_label': 'Amount',
+  'donation.donate_btn': 'Donate {amount} kr',
+  'donation.donate_vipps': 'Pay {amount} kr with Vipps',
+  'donation.supporter': 'Supporter',
+  'donation.supporter_desc': 'Thank you for your support! You have unlimited scans.',
+  'donation.active': 'Active',
+  'donation.expires': 'Valid until {date}',
+  'donation.expired': 'Expired',
+  'donation.expired_desc': 'Your supporter period has expired. Donate again to continue with unlimited scans.',
+  'donation.expired_on': 'Expired on {date}',
+  'donation.donate_again_hint': 'Want to extend or donate again?',
+  'donation.error': 'Failed to start payment',
+  'donation.success': 'Thank you for your donation!',
 
   // Scan limits
   'scan.limit_reached': 'Daily limit reached',

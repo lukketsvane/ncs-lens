@@ -167,7 +167,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
       if (fallbackLink?.user) {
         userId = fallbackLink.user.id;
         // Update metadata
-        await supabaseAdmin.auth.admin.updateUser(userId, {
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
           user_metadata: {
             ...fallbackLink.user.user_metadata,
             vipps_sub: vippsSub,
@@ -196,7 +196,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     userId = existingUser.id;
 
     // Update user metadata with latest Vipps info
-    await supabaseAdmin.auth.admin.updateUser(userId, {
+    await supabaseAdmin.auth.admin.updateUserById(userId, {
       user_metadata: {
         ...existingUser.user_metadata,
         vipps_sub: vippsSub,

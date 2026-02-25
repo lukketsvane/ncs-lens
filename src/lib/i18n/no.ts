@@ -185,7 +185,7 @@ const no: Record<string, string> = {
   'profile.sign_in_vipps': 'Logg inn med Vipps',
   'vipps.login_failed': 'Innlogging med Vipps feila. Prøv igjen.',
 
-  // Subscription
+  // Subscription / Donation
   'subscription.title': 'Abonnement',
   'subscription.free_plan': 'Gratis plan',
   'subscription.free_plan_desc': '10 skanningar per dag',
@@ -204,6 +204,23 @@ const no: Record<string, string> = {
   'subscription.expired_desc': 'Abonnementet ditt har utlope. Forny for å halde fram med ubegrensa skanningar.',
   'subscription.expired_on': 'Utlope {date}',
   'subscription.renew': 'Forny for 10 kr/mnd',
+
+  // Donation
+  'donation.title': 'Støtt NCS Lens',
+  'donation.description': 'Likar du appen? Støtt oss med valfritt beløp via Vipps og få 30 dagar med ubegrensa skanningar!',
+  'donation.amount_label': 'Beløp',
+  'donation.donate_btn': 'Doner {amount} kr',
+  'donation.donate_vipps': 'Betal {amount} kr med Vipps',
+  'donation.supporter': 'Støttespelar',
+  'donation.supporter_desc': 'Takk for støtta! Du har ubegrensa skanningar.',
+  'donation.active': 'Aktiv',
+  'donation.expires': 'Gjeld til {date}',
+  'donation.expired': 'Utlope',
+  'donation.expired_desc': 'Støtteperioden din har utlope. Doner igjen for å halde fram med ubegrensa skanningar.',
+  'donation.expired_on': 'Utlope {date}',
+  'donation.donate_again_hint': 'Vil du forlenge eller donere igjen?',
+  'donation.error': 'Klarte ikkje starte betaling',
+  'donation.success': 'Takk for donasjonen!',
 
   // Scan limits
   'scan.limit_reached': 'Dagleg grense nådd',
