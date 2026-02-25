@@ -16,14 +16,25 @@
   import CommunityTab from '$lib/components/CommunityTab.svelte';
   import ProfileTab from '$lib/components/ProfileTab.svelte';
 
-  // Handle callback params (subscription, Vipps login)
+  // Handle callback params (donation, subscription, Vipps login)
   onMount(async () => {
     const subscriptionParam = $page.url.searchParams.get('subscription');
-    if (subscriptionParam) {
-      if (subscriptionParam === 'success') {
-        toasts.success($t('subscription.activated'));
+    const donationParam = $page.url.searchParams.get('donation');
+    if (donationParam) {
+      if (donationParam === 'success') {
+        toasts.success($t('donation.success'));
       } else {
-        toasts.error($t('subscription.error'));
+        toasts.error($t('donation.error'));
+      }
+      activeTab.set('profile');
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('donation');
+      window.history.replaceState({}, '', cleanUrl.toString());
+    } else if (subscriptionParam) {
+      if (subscriptionParam === 'success') {
+        toasts.success($t('donation.success'));
+      } else {
+        toasts.error($t('donation.error'));
       }
       activeTab.set('profile');
       const cleanUrl = new URL(window.location.href);

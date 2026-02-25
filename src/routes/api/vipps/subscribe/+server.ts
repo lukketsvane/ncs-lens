@@ -4,10 +4,14 @@ import { env } from '$env/dynamic/private';
 import { getSupabaseAdmin } from '$lib/server/supabase-admin';
 
 export const POST: RequestHandler = async ({ request, url }) => {
-  const { userId } = await request.json();
+  const { userId, amount } = await request.json();
   if (!userId) {
     throw error(400, 'Missing userId');
   }
+
+  // amount is in NOK (whole number), minimum 1 NOK
+  const donationNOK = Math.max(1, Math.floor(Number(amount) || 10));
+  const donationOre = donationNOK * 100;
 
   const clientId = env.VIPPS_CLIENT_ID;
   const clientSecret = env.VIPPS_CLIENT_SECRET;
@@ -39,14 +43,14 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const tokenData = await tokenResponse.json();
   const accessToken = tokenData.access_token;
 
-  // Create ePayment for 10 NOK subscription
-  const orderId = `sub-${crypto.randomUUID()}`;
+  // Create ePayment for the user's chosen donation amount
+  const orderId = `donate-${crypto.randomUUID()}`;
   const returnUrl = `${url.origin}/api/vipps/subscribe/callback?orderId=${encodeURIComponent(orderId)}&userId=${encodeURIComponent(userId)}`;
 
   const paymentBody = {
     amount: {
       currency: 'NOK',
-      value: 1000, // 10.00 NOK in øre
+      value: donationOre,
     },
     paymentMethod: {
       type: 'WALLET',
@@ -54,7 +58,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     reference: orderId,
     returnUrl,
     userFlow: 'WEB_REDIRECT',
-    paymentDescription: 'NCS Lens Pro – 10 kr/mnd',
+    paymentDescription: `NCS Lens – ${donationNOK} kr donasjon`,
   };
 
   const paymentResponse = await fetch(`${apiUrl}/epayment/v1/payments`, {
@@ -79,13 +83,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
   const paymentData = await paymentResponse.json();
 
-  // Store pending payment reference in Supabase
+  // Store pending donation reference in Supabase
   const supabaseAdmin = getSupabaseAdmin();
   await supabaseAdmin.from('subscriptions').upsert(
     {
       user_id: userId,
       status: 'pending',
-      plan_type: 'pro',
+      plan_type: 'donation',
       vipps_order_id: orderId,
       start_date: new Date().toISOString(),
     },
