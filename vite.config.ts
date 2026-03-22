@@ -1,24 +1,17 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import path from 'path';
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      plugins: [sveltekit()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+export default defineConfig({
+    plugins: [sveltekit()],
+    server: {
+      port: 3000,
+      host: '0.0.0.0',
+      fs: {
+        allow: [
+          path.resolve(__dirname),
+          path.resolve(__dirname, '../../..'),
+        ],
       },
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
-        fs: {
-          allow: [
-            path.resolve(__dirname),
-            path.resolve(__dirname, '../../..'),
-          ],
-        },
-      }
-    };
+    }
 });
