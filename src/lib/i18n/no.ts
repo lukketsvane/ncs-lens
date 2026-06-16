@@ -15,7 +15,6 @@ const no: Record<string, string> = {
   'scan.sign_in_button': 'Logg inn / Registrer',
   'scan.new_scan': 'Nytt skann',
   'scan.salient': 'Hovudfargar',
-  'scan.help_text': 'ta eit bilde for å identifisere NCS/RAL-kodar og materialoverflater på sekundet.',
   'scan.failed': 'Analysen feila. Prøv igjen.',
 
   // PaletteTab

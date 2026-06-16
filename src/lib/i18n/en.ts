@@ -15,7 +15,6 @@ const en: Record<string, string> = {
   'scan.sign_in_button': 'Sign In / Sign Up',
   'scan.new_scan': 'New Scan',
   'scan.salient': 'Key colors',
-  'scan.help_text': 'take a photo to identify NCS/RAL codes and material finishes instantly.',
   'scan.failed': 'Analysis failed. Please try again.',
 
   // PaletteTab

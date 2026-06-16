@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(grep:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "mcp__4fbf65fe-ee31-4ff1-b93d-c19c760f7e59__get_project"
     ]
   }
 }
