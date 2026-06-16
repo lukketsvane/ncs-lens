@@ -183,10 +183,6 @@
           </div>
         </button>
       {/if}
-
-      <p class="mt-8 text-center text-sm text-gray-400 max-w-[260px] leading-relaxed">
-        {$t('scan.help_text')}
-      </p>
     </div>
   </div>
 </div>
