@@ -4,7 +4,7 @@ A Progressive Web App (PWA) that uses Artificial Intelligence to analyze product
 
 ## Features
 
-*   **AI Analysis**: Identifies products, materials, textures, and finishes using Google Gemini with web search capability.
+*   **AI Analysis**: Identifies products, materials, textures, and finishes using OpenAI GPT-4o vision.
 *   **Product Recognition**: When a known product is identified, searches the web for official manufacturer color codes (NCS/RAL).
 *   **Precision Color Matching**: Matches colors to NCS S-Series and RAL Classic standards with lighting correction.
 *   **Technical Specifications**: Provides detailed color data including Light Reflectance Value (LRV), CMYK, RGB, and NCS component breakdowns (Blackness, Chromaticness, Hue).
@@ -22,7 +22,7 @@ A Progressive Web App (PWA) that uses Artificial Intelligence to analyze product
 *   Svelte 5 / SvelteKit
 *   TypeScript
 *   Tailwind CSS
-*   Google GenAI SDK (Gemini with Google Search grounding)
+*   OpenAI SDK (GPT-4o vision)
 *   Supabase (Auth, Database, Storage)
 *   Lucide Svelte
 
@@ -88,16 +88,39 @@ src/
    ```
    VITE_SUPABASE_URL=your_supabase_project_url
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   GEMINI_API_KEY=your_gemini_api_key
+   OPENAI_API_KEY=your_openai_api_key
    ```
 
-### Supabase Setup
+### Database Setup
 
-Run the SQL migrations in your Supabase project dashboard (SQL Editor):
+All database schema lives in `supabase/migrations/`. There are two ways to bring the
+database up.
 
-1. `supabase/migrations/20240101000000_create_profiles.sql` - Creates user profiles table
-2. `supabase/migrations/20240101000001_create_storage.sql` - Sets up storage bucket for images
-3. `supabase/migrations/20240101000002_create_scans.sql` - Creates scans table for history
+#### Option A — Local development (Supabase CLI + Docker)
+
+Requires Docker running locally. The CLI applies **every** migration automatically.
+
+```bash
+npm run db:start    # boots Postgres + Auth + Storage + Studio, applies all migrations
+npm run db:status   # prints the local API URL + anon/service keys for your .env
+npm run db:reset    # re-applies every migration from scratch (use after editing migrations)
+npm run db:stop     # tears the stack down
+```
+
+Then copy the local values from `db:status` into `.env` (or uncomment the local block
+already present in `.env.example`).
+
+#### Option B — Hosted Supabase project
+
+Apply the migrations to your project. Either link the CLI and push:
+
+```bash
+supabase link --project-ref <your-project-ref>
+supabase db push
+```
+
+…or paste each file in `supabase/migrations/` (in filename order) into the Supabase
+dashboard SQL Editor.
 
 **Important**: In your Supabase project settings, disable email confirmation for easier authentication:
 - Go to Authentication > Providers > Email
