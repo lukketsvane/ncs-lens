@@ -4,7 +4,7 @@ A Progressive Web App (PWA) that uses Artificial Intelligence to analyze product
 
 ## Features
 
-*   **AI Analysis**: Identifies products, materials, textures, and finishes using OpenAI GPT-4o vision.
+*   **AI Analysis**: Identifies products, materials, textures, and finishes using OpenAI GPT-4.1 nano vision.
 *   **Product Recognition**: When a known product is identified, searches the web for official manufacturer color codes (NCS/RAL).
 *   **Precision Color Matching**: Matches colors to NCS S-Series and RAL Classic standards with lighting correction.
 *   **Technical Specifications**: Provides detailed color data including Light Reflectance Value (LRV), CMYK, RGB, and NCS component breakdowns (Blackness, Chromaticness, Hue).
@@ -22,7 +22,7 @@ A Progressive Web App (PWA) that uses Artificial Intelligence to analyze product
 *   Svelte 5 / SvelteKit
 *   TypeScript
 *   Tailwind CSS
-*   OpenAI SDK (GPT-4o vision)
+*   OpenAI SDK (GPT-4.1 nano vision)
 *   Supabase (Auth, Database, Storage)
 *   Lucide Svelte
 
