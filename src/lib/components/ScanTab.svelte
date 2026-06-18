@@ -13,6 +13,7 @@
   let fileInput: HTMLInputElement;
   let scanStatus = $state<{ allowed: boolean; remaining: number; hasSubscription: boolean } | null>(null);
   let scanStatusLoading = $state(false);
+  let previewUrl = $state<string | null>(null);
 
   $effect(() => {
     if ($user) {
@@ -55,6 +56,7 @@
     reader.onloadend = async () => {
       try {
         const dataUrl = reader.result as string;
+        previewUrl = dataUrl;
         const base64 = dataUrl.split(",")[1];
 
         const result = await analyzeImage(base64, $salientMode);
@@ -78,6 +80,7 @@
         toasts.error($t('scan.failed'));
       } finally {
         loading.set(false);
+        previewUrl = null;
         checkScanStatus();
       }
     };
@@ -100,6 +103,15 @@
             <h2 class="text-xl font-bold text-gray-900 tracking-tight">{$t('scan.analyzing')}</h2>
             <p class="text-sm text-gray-400 animate-pulse">{$t('scan.analyzing_desc')}</p>
           </div>
+          {#if previewUrl}
+            <div class="relative z-10 w-40 h-40 rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
+              <img
+                src={previewUrl}
+                alt={$t('scan.analyzing')}
+                class="w-full h-full object-cover"
+              />
+            </div>
+          {/if}
         </div>
       {:else if !$user}
         <div class="group relative bg-gray-100 rounded-[40px] w-full max-w-[320px] aspect-[3/4] border border-gray-200 flex flex-col items-center justify-center gap-6 overflow-hidden">
