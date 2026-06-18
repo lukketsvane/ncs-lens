@@ -176,7 +176,7 @@ export const POST: RequestHandler = async ({ request }) => {
   const openai = new OpenAI({ apiKey });
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4.1-nano',
+    model: 'gpt-4.1-mini',
     temperature: 0.1,
     response_format: {
       type: 'json_schema',
