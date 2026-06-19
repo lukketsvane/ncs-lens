@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Sparkles, Camera, Image as ImageIcon, Loader2, User, Zap, AlertCircle, Crown } from 'lucide-svelte';
+  import { Sparkles, Camera, Image as ImageIcon, User, Zap, AlertCircle, Crown } from 'lucide-svelte';
   import { user } from '$lib/stores/auth';
   import { loading, salientMode, detailItem, history, activeTab } from '$lib/stores/app';
   import { analyzeImage } from '$lib/api';
@@ -94,23 +94,15 @@
 
     <div class="flex-1 flex flex-col justify-center items-center pb-12">
       {#if $loading}
-        <div class="group relative bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] border border-white flex flex-col items-center justify-center gap-6 overflow-hidden">
-          <div class="absolute inset-0 bg-gradient-to-tr from-gray-50 via-white to-gray-50 opacity-50"></div>
-          <div class="relative z-10">
-            <Loader2 size={48} class="animate-spin text-black" />
-          </div>
-          <div class="relative z-10 text-center space-y-2">
-            <h2 class="text-xl font-bold text-gray-900 tracking-tight">{$t('scan.analyzing')}</h2>
-            <p class="text-sm text-gray-400 animate-pulse">{$t('scan.analyzing_desc')}</p>
-          </div>
+        <div class="relative bg-white rounded-[40px] w-full max-w-[320px] aspect-[3/4] border border-white overflow-hidden">
           {#if previewUrl}
-            <div class="relative z-10 w-40 h-40 rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
-              <img
-                src={previewUrl}
-                alt={$t('scan.analyzing')}
-                class="w-full h-full object-cover"
-              />
-            </div>
+            <img
+              src={previewUrl}
+              alt=""
+              class="absolute inset-0 w-full h-full object-cover loading-pulse"
+            />
+          {:else}
+            <div class="absolute inset-0 bg-gradient-to-tr from-gray-50 via-white to-gray-50 loading-pulse"></div>
           {/if}
         </div>
       {:else if !$user}
@@ -206,3 +198,25 @@
   accept="image/*"
   class="hidden"
 />
+
+<style>
+  .loading-pulse {
+    animation: loading-pulse 1.8s ease-in-out infinite;
+  }
+
+  @keyframes loading-pulse {
+    0%, 100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .loading-pulse {
+      animation: none;
+      opacity: 0.5;
+    }
+  }
+</style>
